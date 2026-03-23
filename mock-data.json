@@ -1,0 +1,23 @@
+[
+  {
+    "question_id": 1,
+    "question": "Purpose / Vision / Mission",
+    "relevant_chunks": [
+      {
+        "page_range": "4-5",
+        "verbatim_text": "Our purpose is to accelerate the transition to sustainable energy through radical innovation.",
+        "relevance": "high",
+        "relevance_note": "Direct statement of organizational purpose."
+      }
+    ],
+    "summary": "The organization has a highly defined and strategic purpose focused on external impact.",
+    "score": 4,
+    "score_label": "Level 4 — Strategic Integration",
+    "justification": {
+      "why_this_score": "The purpose is clearly articulated and integrated into strategic goals.",
+      "why_not_lower": "It goes beyond basic statements to include performance targets.",
+      "why_not_higher": "There is limited evidence of systemic, self-evolving feedback loops characterizing Level 5."
+    },
+    "no_content_found": false
+  }
+]
