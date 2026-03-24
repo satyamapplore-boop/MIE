@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MIE | Maturity Bento</title>
+    <title>MIE | Deterministic Engine</title>
     <link rel="stylesheet" href="style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -18,21 +18,21 @@
         <!-- Modern Header -->
         <header class="app-header">
             <div class="logo-section">
-                <div class="logo-icon-box"><i data-lucide="brain"></i></div>
-                <h1>MIE</h1>
+                <div class="logo-icon-box"><i data-lucide="shield-check"></i></div>
+                <h1>MIE <span style="font-size:14px; opacity:0.6; font-weight:400; margin-left:8px;">| Verifiable Deterministic Mode</span></h1>
             </div>
             <div class="header-controls">
-                <input type="password" id="claude-api-key" class="key-input" placeholder="Claude API Key">
+                <span class="dim-pill" style="background:#e8f5e9; color:#2e7d32; border:1px solid #a5d6a7;"><i data-lucide="lock" style="width:14px;height:14px;margin-right:6px;"></i>100% Local (No API)</span>
             </div>
         </header>
 
         <main class="app-main">
-            <!-- Bento Intake Hub -->
+            <!-- Intake Hub -->
             <section id="hero-hub" class="intake-grid">
                 <div class="bento-card dark">
-                    <div class="icon-chip"><i data-lucide="upload-cloud"></i></div>
-                    <h2 class="card-title">Analysis Intake</h2>
-                    <p style="opacity:0.6; font-size:14px; margin-bottom: 24px;">Upload corporate documentation to begin maturity mapping.</p>
+                    <div class="icon-chip"><i data-lucide="upload-cloud" style="color:#000;"></i></div>
+                    <h2 class="card-title" style="font-size: 28px; margin-bottom: 8px;">Auditable Document Intake</h2>
+                    <p style="opacity:0.6; font-size:14px; margin-bottom: 24px;">Upload annual reports. Engine strictly extracts verbatim text according to heuristic rules. Zero hallucination.</p>
                     
                     <div class="drop-zone" id="drop-zone">
                         <i data-lucide="file-text" style="opacity:0.5; margin-bottom:16px;"></i>
@@ -40,56 +40,60 @@
                         <input type="file" id="file-input" style="position:absolute; opacity:0; width:100%; height:100%; top:0; left:0; cursor:pointer">
                     </div>
                     
-                    <button id="analyze-btn" class="primary-pill-btn" style="background:var(--lvl-5); color:black; margin-top:32px; width:100%;" disabled>
-                        Begin Engine
+                    <button id="analyze-btn" class="primary-pill-btn" style="background:var(--accent-green); color:black; margin-top:32px; width:100%; border-radius: 16px;" disabled>
+                        Begin Extraction Pipeline
                         <i data-lucide="play-circle"></i>
                     </button>
                 </div>
 
-                <div class="bento-card">
-                    <div class="icon-chip neon"><i data-lucide="settings-2"></i></div>
-                    <h2 class="card-title">Dimension Focus</h2>
-                    <p style="color:var(--text-muted); font-size:14px; margin-bottom:32px;">Configure the 7 core maturity pillars for deep analysis.</p>
+                <div class="bento-card" style="background: white;">
+                    <div class="icon-chip neon" style="background: var(--accent-purple);"><i data-lucide="list-checks" style="color:#fff;"></i></div>
+                    <h2 class="card-title" style="font-size: 28px; margin-bottom: 8px;">Framework Constants</h2>
+                    <p style="color:var(--text-muted); font-size:14px; margin-bottom:32px;">Select maturity pillars. System will strictly pull verbatim evidence for each.</p>
                     
                     <div class="dimensions-selector" id="dimensions-list">
-                        <!-- Populated via JS as Pills -->
-                    </div>
-                    
-                    <div style="margin-top: 40px; border-top: 1px solid rgba(0,0,0,0.05); padding-top: 24px; display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-size:13px; font-weight:700;">Engine Mode:</span>
-                        <div class="dim-pill" style="background:black; color:white;">AI Intelligent Mode</div>
+                        <!-- Populated via JS -->
                     </div>
                 </div>
             </section>
 
             <!-- Loading State -->
             <section id="loading-state" class="hidden" style="text-align: center; padding: 100px 0;">
-                <div class="icon-chip neon" style="width: 80px; height: 80px; margin: 0 auto 32px;"><i data-lucide="cpu" style="width:32px; height:32px;"></i></div>
-                <h2 id="loading-message">Initializing AI Processor...</h2>
+                <div class="icon-chip neon" style="width: 80px; height: 80px; margin: 0 auto 32px; background:var(--accent-green);"><i data-lucide="cpu" style="width:32px; height:32px; color:black;"></i></div>
+                <h2 id="loading-message" style="font-size:24px;">Running Deterministic Pipeline...</h2>
                 <div style="font-size: 48px; font-weight: 700; margin-top: 16px;" id="loading-percent">...</div>
             </section>
 
-            <!-- Results Matrix -->
+            <!-- Results Dashboard (Bento Grid) -->
             <section id="results-dashboard" class="hidden">
-                <div class="results-matrix" id="dimensions-results">
-                    <!-- Bento Maturity Cards populated via JS -->
-                </div>
-                
-                <div style="margin-top: 60px; display: flex; justify-content: space-between; align-items: center; background: white; padding: 24px 40px; border-radius: 30px; box-shadow: var(--shadow-soft);">
+                <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 32px;">
                     <div>
-                        <h4 style="font-size:14px; opacity:0.5;">Analysis Complete</h4>
-                        <h2 style="font-size:24px;">7 Pillars Mapped</h2>
+                        <h2 style="font-size:32px; letter-spacing: -1px;">Extraction Results</h2>
+                        <p style="opacity: 0.5; font-size: 14px; font-weight: 500; margin-top: 4px;">Zero-hallucination insights. Click a card for verbatim audit logs.</p>
                     </div>
                     <div style="display: flex; gap: 12px;">
-                        <button id="export-json" class="dim-pill">Download JSON</button>
-                        <button id="export-csv" class="dim-pill">Download CSV</button>
+                        <button id="export-json" class="primary-pill-btn" style="padding: 12px 24px; font-size:14px; border-radius:12px;">Export JSON</button>
                     </div>
+                </div>
+                
+                <!-- The Bento Grid Container -->
+                <div class="results-matrix" id="audit-bento-grid">
+                    <!-- Cards populated via JS -->
                 </div>
             </section>
         </main>
     </div>
 
-    <!-- Unified App Logic -->
-    <script src="js/app.js?v=6"></script>
+    <!-- Details Modal -->
+    <div id="details-modal" class="modal hidden">
+        <div class="modal-content">
+            <button id="close-modal" class="close-btn"><i data-lucide="x"></i></button>
+            <div id="modal-body">
+                <!-- Inner populated by JS -->
+            </div>
+        </div>
+    </div>
+
+    <script src="js/app.js?v=8"></script>
 </body>
 </html>
