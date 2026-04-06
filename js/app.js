@@ -1,402 +1,303 @@
 /**
- * MIE Deterministic Extraction Engine (V8 - Bento Edition)
- * Zero-Hallucination, Rule-Based Scoring, Auditable Table Output
+ * MIE Enterprise Analysis Engine — Frontend Orchestrator
+ * Connects to Backend v2.1 (Port 4242)
  */
 
-const DIMENSIONS = [
-    { 
-        id: 1, 
-        title: "Purpose / Vision / Mission", 
-        keywords: ["purpose", "why we exist", "vision", "mission", "values", "culture", "Impact", "equity", "stewardship", "planet", "ESG", "Sustainability"],
-        triggers: ["purpose", "why we exist", "ESG", "Sustainability", "societal impact", "transforming the world"],
-        rubric: [
-            { l: 1, t: "Initial", d: "Purely financial results focus." },
-            { l: 2, t: "Developing", d: "Core values referenced." },
-            { l: 3, t: "Defined", d: "Extends to employees/suppliers." },
-            { l: 4, t: "Advanced", d: "Stakeholder value creation." },
-            { l: 5, t: "Transformative", d: "Force for global expansion." }
-        ]
-    },
-    { 
-        id: 2, 
-        title: "Workforce Model", 
-        keywords: ["workforce", "contractors", "gig workers", "flexible", "on-demand", "permanent", "people strategy", "headcount", "outsourcing"],
-        triggers: ["contractors", "gig workers", "flexible workforce", "on-demand", "people strategy"],
-        rubric: [
-            { l: 1, t: "Initial", d: "100% full-time employees." },
-            { l: 2, t: "Developing", d: "Ad-hoc contractors." },
-            { l: 3, t: "Defined", d: "Explicit flexible mix." },
-            { l: 4, t: "Advanced", d: "Strategic contractual use." },
-            { l: 5, t: "Transformative", d: "Predominantly on-demand core." }
-        ]
-    },
-    { 
-        id: 3, 
-        title: "Stakeholder Community", 
-        keywords: ["community", "NPS", "surveys", "feedback", "listening", "engagement", "advisory board", "co-creation", "co-design"],
-        triggers: ["NPS", "surveys", "customer panels", "advisory boards", "co-design", "co-creation"],
-        rubric: [
-            { l: 1, t: "Initial", d: "Purely transactional interactions." },
-            { l: 2, t: "Developing", d: "Reactive surveys/market research." },
-            { l: 3, t: "Defined", d: "Dedicated community resources." },
-            { l: 4, t: "Advanced", d: "Highly targeted feedback loops." },
-            { l: 5, t: "Transformative", d: "Co-creation with stakeholders." }
-        ]
-    },
-    { 
-        id: 4, 
-        title: "Disruptive Technology", 
-        keywords: ["AI", "IoT", "Blockchain", "Drones", "3D Printing", "Genomics", "Crypto", "Digital transformation", "R&D", "Innovation lab", "Patents"],
-        triggers: ["Blockchain", "IoT", "AI", "Digital transformation", "Innovation labs", "Patents", "Deep tech"],
-        rubric: [
-            { l: 1, t: "Initial", d: "Relies entirely on legacy systems." },
-            { l: 2, t: "Developing", d: "Minimal/ad-hoc investment." },
-            { l: 3, t: "Defined", d: "Active POCs and pilot projects." },
-            { l: 4, t: "Advanced", d: "Significant committed investment." },
-            { l: 5, t: "Transformative", d: "Pioneering industry leader." }
-        ]
-    },
-    { 
-        id: 5, 
-        title: "External Integration", 
-        keywords: ["suppliers", "partners", "contractors", "integration", "value chain", "procurement", "Vendor management", "Portal", "API", "Shared platform", "Open ecosystem"],
-        triggers: ["Procurement", "Vendor management", "Partner portal", "API integration", "Shared platforms", "Open ecosystem"],
-        rubric: [
-            { l: 1, t: "Initial", d: "Siloed relationships." },
-            { l: 2, t: "Developing", d: "Manual structured interactions." },
-            { l: 3, t: "Defined", d: "Partially automated processes." },
-            { l: 4, t: "Advanced", d: "Robust, trust-based automation." },
-            { l: 5, t: "Transformative", d: "Seamless value stream alignment." }
-        ]
-    },
-    { 
-        id: 6, 
-        title: "Risk & Failure Culture", 
-        keywords: ["risk", "failure", "experiment", "learning", "innovation lab", "fail fast", "test and learn", "agile", "pivot"],
-        triggers: ["Innovation lab", "Fail fast", "Test and learn", "Agile", "Celebrated failures", "Culture of learning"],
-        rubric: [
-            { l: 1, t: "Initial", d: "Risk-averse; failure is punished." },
-            { l: 2, t: "Developing", d: "Sporadic experimentation pockets." },
-            { l: 3, t: "Defined", d: "Safe, sandboxed failure allowed." },
-            { l: 4, t: "Advanced", d: "Embedded organizational risk-taking." },
-            { l: 5, t: "Transformative", d: "Antifragile; failure is celebratory." }
-        ]
-    },
-    { 
-        id: 7, 
-        title: "Decentralized Decision-Making", 
-        keywords: ["decentralized", "authority", "distributed", "autonomy", "hierarchy", "CEO", "Agile squads", "OKRs", "Flat org", "Self-managing", "DAO", "Blockchain governance"],
-        triggers: ["Empowerment", "Team autonomy", "Agile squads", "OKRs", "Flat org", "Self-managing teams", "Distributed authority"],
-        rubric: [
-            { l: 1, t: "Initial", d: "Strict top-down command/control." },
-            { l: 2, t: "Developing", d: "Isolated functional delegation." },
-            { l: 3, t: "Defined", d: "Decentralized customer-facing zones." },
-            { l: 4, t: "Advanced", d: "Organization-wide empowered agile." },
-            { l: 5, t: "Transformative", d: "Fully self-organizing co-creation." }
-        ]
-    }
-];
+const API_BASE = 'http://localhost:4242/api';
+let currentResults = null;
+let currentDimensions = [];
 
-let currentReportData = null;
-let currentResults = [];
+/**
+ * INIT
+ */
+const init = async () => {
+    lucide.createIcons();
+    await fetchDimensions();
+    
+    // UI Bindings
+    const fileInput = document.getElementById('file-input');
+    const analyzeBtn = document.getElementById('analyze-btn');
+    const dropZone = document.getElementById('drop-zone');
 
-// --- CORE UTILITIES ---
-
-const parseDocument = async (file, onProgress) => {
-    if (typeof pdfjsLib !== 'undefined') pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-    const ext = file.name.split('.').pop().toLowerCase();
-    if (ext === 'pdf') {
-        const data = await file.arrayBuffer();
-        const pdf = await pdfjsLib.getDocument({ data }).promise;
-        const paragraphs = [];
-        for (let i = 1; i <= pdf.numPages; i++) {
-            if (onProgress) onProgress(i, pdf.numPages);
-            const page = await pdf.getPage(i);
-            const textContent = await page.getTextContent();
-            // Try to split into paragraphs/sentences roughly
-            const cleanText = textContent.items.map(item => item.str).join(' ').trim();
-            const segments = cleanText.split('. ');
-            
-            segments.forEach(seg => {
-                if (seg.trim().length >= 30) {
-                    paragraphs.push({ page: i, text: seg.trim() + '.' });
-                }
-            });
-            page.cleanup();
-        }
-        return paragraphs;
-    } else {
-        const data = await file.arrayBuffer();
-        const result = await mammoth.extractRawText({ arrayBuffer: data });
-        const paragraphs = []; 
-        const segments = result.value.split('\n');
-        
-        let pageNum = 1;
-        let charCount = 0;
-        segments.forEach(seg => {
-            if (seg.trim().length >= 30) {
-                paragraphs.push({ page: pageNum, text: seg.trim() });
-            }
-            charCount += seg.length;
-            if (charCount > 3000) { pageNum++; charCount = 0; }
-        });
-        return paragraphs;
-    }
-};
-
-const extractVerbatimChunks = (paragraphs, dim) => {
-    const relevant = [];
-    paragraphs.forEach(p => {
-        const txt = p.text.toLowerCase();
-        let matchCount = 0;
-        let foundKeywords = [];
-        
-        [...dim.keywords, ...dim.triggers].forEach(k => {
-            if (txt.includes(k.toLowerCase())) {
-                matchCount++;
-                foundKeywords.push(k.toLowerCase());
-            }
-        });
-        
-        if (matchCount > 0) {
-            relevant.push({
-                page: p.page,
-                text: p.text,
-                score: matchCount,
-                keywords: Array.from(new Set(foundKeywords))
-            });
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) {
+            const file = e.target.files[0];
+            dropZone.querySelector('p').textContent = `Ready: ${file.name}`;
+            dropZone.style.borderColor = 'var(--accent-green)';
+            analyzeBtn.disabled = false;
         }
     });
-    
-    // Sort by relevance score
-    return relevant.sort((a, b) => b.score - a.score).slice(0, 3);
+
+    analyzeBtn.addEventListener('click', startAnalysis);
+
+    // Modal Close
+    document.getElementById('close-modal').onclick = () => {
+        document.getElementById('details-modal').classList.add('hidden');
+    };
 };
 
-const determineScore = (chunks, dim) => {
-    if (chunks.length === 0) return 0;
-    
-    // Total unique matched keywords constraint
-    let allKWs = new Set();
-    chunks.forEach(c => c.keywords.forEach(k => allKWs.add(k)));
-    
-    const count = allKWs.size;
-    let level = 1;
-    if (count <= 2) level = 1;
-    else if (count === 3) level = 2;
-    else if (count === 4) level = 3;
-    else if (count >= 5 && count <= 6) level = 4;
-    else if (count > 6) level = 5;
-    
-    return level;
+/**
+ * FETCH DIMENSIONS
+ */
+const fetchDimensions = async () => {
+    try {
+        const res = await fetch(`${API_BASE}/dimensions`);
+        const data = await res.json();
+        if (data.success) {
+            currentDimensions = data.dimensions;
+            renderDimensionsSelector(data.dimensions);
+        }
+    } catch (err) {
+        console.error('Failed to fetch dimensions:', err);
+    }
 };
 
-// --- RENDERERS ---
-
-const renderDimensions = () => {
-    const container = document.getElementById('dimensions-list');
-    container.innerHTML = DIMENSIONS.map(d => `
-        <label class="dim-pill" style="cursor:pointer">
-            <input type="checkbox" name="dimension" value="${d.id}" checked style="margin-right:8px">
+const renderDimensionsSelector = (dims) => {
+    const list = document.getElementById('dimensions-list');
+    list.innerHTML = dims.map(d => `
+        <label class="dim-pill">
+            <input type="checkbox" name="dimension" value="${d.id}" checked>
             <span>${d.title}</span>
         </label>
     `).join('');
 };
 
-const getCardColor = (score) => {
-    if(score === 0) return 'background: #f4f4f4; color: #888; border-color: #ddd;';
-    if(score <= 2) return 'background: #ffebee; color: #c62828;';
-    if(score === 3) return 'background: #fff8e1; color: #f57f17;';
-    return 'background: var(--accent-green); color: #111;'; // Level 4 and 5
+/**
+ * START ANALYSIS
+ */
+const startAnalysis = async () => {
+    const fileInput = document.getElementById('file-input');
+    const selectedDims = Array.from(document.querySelectorAll('input[name="dimension"]:checked')).map(i => i.value);
+    
+    if (!fileInput.files[0]) return;
+
+    // UI Flip
+    document.getElementById('hero-hub').classList.add('hidden');
+    document.getElementById('loading-state').classList.remove('hidden');
+    document.getElementById('loading-message').textContent = 'Extracting Verbatim Evidence...';
+
+    const formData = new FormData();
+    formData.append('pdf', fileInput.files[0]);
+    formData.append('dimensions', selectedDims.join(','));
+
+    try {
+        // Start Progress Animation (0 to 100)
+        let progress = 0;
+        const progressEl = document.getElementById('progress-pct');
+        const progressInterval = setInterval(() => {
+            if (progress < 80) {
+                progress += Math.random() * 4; // Fast data retrieval phase
+            } else if (progress < 96) {
+                progress += Math.random() * 0.8; // Intensive extraction phase
+            } else if (progress < 99) {
+                progress += 0.05; // Final synthesis phase
+            }
+            if (progressEl) progressEl.innerText = Math.floor(progress) + '%';
+        }, 400);
+
+        const response = await fetch(`${API_BASE}/analyse`, {
+            method: 'POST',
+            body: formData
+        });
+
+        const data = await response.json();
+        
+        // Finalize
+        clearInterval(progressInterval);
+        if (progressEl) progressEl.innerText = '100%';
+
+        if (data.success) {
+            currentResults = data.results;
+            
+            // Short delay to show 100% before transitioning
+            setTimeout(() => {
+                document.getElementById('loading-state').classList.add('hidden');
+                document.getElementById('results-dashboard').classList.remove('hidden');
+                renderResultsGrid(data.results);
+            }, 600);
+        } else {
+            throw new Error(data.error || 'Analysis failed');
+        }
+    } catch (err) {
+        alert('Error: ' + err.message);
+        document.getElementById('loading-state').classList.add('hidden');
+        document.getElementById('hero-hub').classList.remove('hidden');
+    }
 };
 
-const getIcons = (id) => {
-    const icons = ['target', 'users', 'heart', 'cpu', 'link', 'alert-triangle', 'git-branch'];
-    return icons[(id - 1) % icons.length];
-};
 
-const renderResults = (results) => {
+/**
+ * RENDER RESULTS
+ * Reverted to 7 Strategic Pillars (with 25-point logic)
+ */
+const renderResultsGrid = (results) => {
     const grid = document.getElementById('audit-bento-grid');
     grid.innerHTML = '';
 
-    results.forEach((res) => {
+    results.forEach((res, index) => {
         const card = document.createElement('div');
-        card.className = 'result-card';
+        card.className = 'result-card lift-animate';
         
-        let highlightsHTML = '';
-        if (res.score === 0) {
-            highlightsHTML = `<li class="error-text">No relevant content found matching framework requirements.</li>`;
-        } else {
-            const shortVerbatim = res.chunks[0].text.length > 70 
-                ? res.chunks[0].text.substring(0, 70) + '...' 
-                : res.chunks[0].text;
-            highlightsHTML = `
-                <li><strong>Top Keyword Hit:</strong> <span style="text-transform:capitalize;">${res.found_keywords[0]}</span></li>
-                <li style="font-style:italic">"${shortVerbatim}" [P.${res.chunks[0].page}]</li>
-            `;
-        }
+        const title = res["Attribute"] || `Pillar ${index + 1}`;
+        const scoreVal = res["Score"]; 
+        const numericScore = typeof scoreVal === 'number' ? scoreVal : 0;
+        
+        // Refined 7-Pillar Colors
+        const pillarColors = [
+            '#00ff88', // Purpose (Neon Green)
+            '#00ddeb', // Staff (Cyan)
+            '#a29bfe', // Community (Purple)
+            '#f0db4f', // Algorithms (Yellow)
+            '#ff6b6b', // Assets (Pink)
+            '#ffa502', // Engagement (Orange)
+            '#74b9ff'  // Strategy (Sky Blue)
+        ];
+        const categoryColor = pillarColors[index] || pillarColors[0];
+        const icon = getDimensionIcon(title);
+        const levelLabel = res["Level"];
 
         card.innerHTML = `
             <div class="rc-top">
                 <div class="rc-header">
-                    <div class="rc-icon"><i data-lucide="${getIcons(res.question_id)}" style="width:20px; color:#555;"></i></div>
-                    <div style="background:#f4f4f4; border-radius:12px; padding:6px 12px; font-size:11px; font-weight:700; opacity:0.6;">Pillar 0${res.question_id}</div>
+                    <div class="rc-icon" style="background: ${categoryColor}22">
+                        <i data-lucide="${icon}" style="color: ${categoryColor}"></i>
+                    </div>
+                    <span style="font-size: 10px; color: ${categoryColor}; letter-spacing: 1px; font-weight: 900;">PILLAR 0${index + 1}</span>
                 </div>
-                <h3 class="rc-title">${res.question}</h3>
+                <h3 class="rc-title" style="color: white; margin-top: 12px; font-size: 18px;">${title}</h3>
                 <ul class="rc-bullets">
-                    ${highlightsHTML}
+                    <li style="color: ${categoryColor}; font-weight: 700; font-size: 13px;">${levelLabel}</li>
+                    <li style="font-style: italic; opacity: 0.5; font-size: 11px; margin-top: 8px; line-height: 1.4;">"${truncate(res["Most Representative Statement"], 95)}"</li>
                 </ul>
             </div>
-            <div class="rc-score-box" style="${getCardColor(res.score)}">
-                <span>Maturity Score</span>
-                <span class="score-badge" style="background:rgba(255,255,255,0.6); padding:6px 12px; border-radius:8px; font-size:14px; font-weight:900;">
-                    ${res.score === 0 ? 'N/A' : `Level ${res.score}`}
-                </span>
+            <div class="rc-score-box" style="border-top-color: rgba(255,255,255,0.05); background: rgba(255,255,255,0.02)">
+                <span style="color: rgba(255,255,255,0.3); font-size: 10px; letter-spacing: 1px;">MATURITY SCORE</span>
+                <span style="color: ${categoryColor}; font-size: 20px; font-weight: 900;">${typeof scoreVal === 'number' ? scoreVal + '.0' : 'N/A'}</span>
             </div>
         `;
 
-        card.onclick = () => openModal(res);
+        card.onclick = () => openDetails(res);
         grid.appendChild(card);
     });
     lucide.createIcons();
 };
 
-const openModal = (res) => {
+
+
+/**
+ * OPEN DETAILS MODAL
+ * CRITICAL FIX: Use the Correct Field Names
+ */
+const openDetails = (res) => {
     const modal = document.getElementById('details-modal');
     const body = document.getElementById('modal-body');
-    
-    let verbatimHTML = '';
-    if (res.score === 0) {
-        verbatimHTML = `<div class="error-text">"no relevant content found"</div>`;
-    } else {
-        verbatimHTML = res.chunks.map(c => `
-            <div class="verbatim-text" style="margin-bottom:8px;">
-                "${c.text}"
-                <div style="font-style:normal; font-family:var(--font-sans); font-size:10px; font-weight:700; color:#888; margin-top:6px;">
-                    [Page ${c.page}]
+    const title = res["Attribute"];
+    const scoreVal = res["Score"];
+    const numericScore = typeof scoreVal === 'number' ? scoreVal : 0;
+    const color = getLevelColor(numericScore);
+
+    // Extract Statement list builder
+    let extractListHtml = '';
+    let i = 1;
+    while(res[`Extract Statement ${i}`]) {
+        extractListHtml += `
+            <div style="background: #f9f9f9; border: 1px solid #eee; padding: 20px; border-radius: 16px; margin-bottom: 12px;">
+                <div style="font-weight: 800; color: #888; font-size: 10px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px;">Extract Statement ${i}</div>
+                <div style="font-family: 'Inter', sans-serif; font-style: italic; line-height: 1.6; color: #111;">
+                    "${res[`Extract Statement ${i}`]}"
                 </div>
             </div>
-        `).join('');
+        `;
+        i++;
     }
 
-    let justificationHTML = '';
-    if (res.score === 0) {
-        justificationHTML = `<div class="error-text">unable to score, no relevant content identified</div>`;
-    } else {
-        justificationHTML = `
-            <div class="justification-block">
-                <strong>Why this level is correct:</strong>
-                <span>Matches Level ${res.score} definition. Found keywords: ${res.found_keywords.join(', ')}.</span>
-                
-                <strong>Why not lower:</strong>
-                <span>Contains clear strategic phrasing exceeding lower-tier foundational constraints.</span>
-                
-                <strong>Why not higher:</strong>
-                <span>Lacks critical mass (keyword density) required to satisfy higher-tier conditions.</span>
-            </div>
-        `;
-    }
-    
     body.innerHTML = `
-        <div style="display:flex; align-items:center; gap:16px; margin-bottom: 24px;">
-            <div class="rc-icon" style="width:48px; height:48px;"><i data-lucide="${getIcons(res.question_id)}" style="width:24px; color:#555;"></i></div>
-            <div>
-                <h2 style="font-size:24px; margin-bottom:4px;">${res.question}</h2>
-                <span class="score-badge" style="${getCardColor(res.score)}; display:inline-block; padding:4px 8px; border-radius:6px; font-size:12px; font-weight:800;">
-                    ${res.score === 0 ? 'N/A' : `Level ${res.score}`}
+        <div style="border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 24px; margin-bottom: 32px;">
+            <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 16px;">
+                <div class="rc-icon" style="width: 48px; height: 48px; background: ${color}22">
+                    <i data-lucide="${getDimensionIcon(title)}" style="color: ${color}"></i>
+                </div>
+                <h2 style="font-size: 28px; color: white;">${title}</h2>
+            </div>
+            <div style="display: flex; gap: 12px;">
+                <span style="background: ${color}; color: #000; padding: 4px 12px; border-radius: 8px; font-weight: 800; font-size: 12px;">
+                    ${res["Level"]}
                 </span>
             </div>
         </div>
-        
-        <div style="margin-bottom: 32px;">
-            <h4 style="font-size:12px; margin-bottom:12px; opacity:0.5; text-transform:uppercase;">Rule-Based Justification</h4>
-            ${justificationHTML}
-        </div>
-        
-        <div>
-            <h4 style="font-size:12px; margin-bottom:12px; opacity:0.5; text-transform:uppercase;">Extracted Verbatim Audit Log</h4>
-            ${verbatimHTML}
-        </div>
+
+        <section style="margin-bottom: 40px;">
+            <h4 style="font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: rgba(255,255,255,0.4); margin-bottom: 16px;">Summary Statement</h4>
+            <div style="font-size: 14px; line-height: 1.8; color: white; white-space: pre-wrap; font-weight: 300;">${res["Summary Statement"]}</div>
+        </section>
+
+        <section style="margin-bottom: 40px;">
+            <h4 style="font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: rgba(255,255,255,0.4); margin-bottom: 16px;">Justification for Level</h4>
+            <div style="color: white; border-left: 4px solid ${color}; padding: 20px; font-size: 14px; line-height: 1.6; white-space: pre-wrap; background: rgba(255,255,255,0.03); border-radius: 0 4px 4px 0;">${res["Justification for Level"]}</div>
+        </section>
+
+        <section style="margin-bottom: 40px;">
+            <h4 style="font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: rgba(255,255,255,0.4); margin-bottom: 16px;">Why other statements are not relevant</h4>
+            <div style="color: rgba(255,255,255,0.7); background: rgba(255,255,255,0.02); padding: 20px; border-radius: 12px; font-size: 13.5px; border: 1px solid rgba(255,255,255,0.05); white-space: pre-wrap;">${res["Justification as to why other statements are not relevant"]}</div>
+        </section>
+
+        <section>
+            <h4 style="font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: rgba(255,255,255,0.4); margin-bottom: 16px;">Direct Verbatim Audit Log</h4>
+            <div style="max-height: 400px; overflow-y: auto; padding-right: 12px;">
+                ${extractListHtml || '<p style="opacity: 0.5;">No statements found.</p>'}
+            </div>
+        </section>
     `;
-    
-    lucide.createIcons();
+
     modal.classList.remove('hidden');
-};
-
-// --- APP FLOW ---
-
-const init = () => {
-    renderDimensions();
     lucide.createIcons();
-    const fIn = document.getElementById('file-input');
-    fIn.addEventListener('change', (e) => handleFile(e.target.files[0]));
-    document.getElementById('analyze-btn').addEventListener('click', startAnalysis);
-    
-    // Modal Setup
-    document.getElementById('close-modal').onclick = () => {
-        document.getElementById('details-modal').classList.add('hidden');
-    };
-    document.getElementById('details-modal').onclick = (e) => {
-        if(e.target.id === 'details-modal') {
-            document.getElementById('details-modal').classList.add('hidden');
-        }
-    };
 };
 
-const handleFile = async (file) => {
-    if (!file) return;
-    const loading = document.getElementById('loading-state');
-    const hero = document.getElementById('hero-hub');
-    hero.classList.add('hidden');
-    loading.classList.remove('hidden');
-    document.getElementById('loading-message').textContent = 'Parsing Document & Tokenizing...';
-    
-    try {
-        const paragraphs = await parseDocument(file, (c, t) => {
-            document.getElementById('loading-percent').textContent = `${Math.round((c/t)*100)}%`;
-        });
-        
-        currentReportData = paragraphs; // array of {page, text}
-        document.getElementById('analyze-btn').disabled = false;
-        document.getElementById('analyze-btn').innerHTML = 'Begin Extraction Pipeline <i data-lucide="play-circle"></i>';
-        loading.classList.add('hidden');
-        hero.classList.remove('hidden');
-        lucide.createIcons();
-        document.getElementById('drop-zone').querySelector('p').textContent = `Document Loaded: ${file.name} (${paragraphs.length} blocks)`;
-    } catch (e) { alert(e.message); loading.classList.add('hidden'); }
+/**
+ * UTILS
+ */
+const getLevelColor = (lvl) => {
+    const colors = ['#888', '#ff4444', '#ffcc00', '#5dc9ff', '#9d83ff', '#00ff88'];
+    return colors[lvl] || colors[0];
 };
 
-const startAnalysis = async () => {
-    const ids = Array.from(document.querySelectorAll('input[name="dimension"]:checked')).map(c => parseInt(c.value));
-    document.getElementById('hero-hub').classList.add('hidden');
-    document.getElementById('loading-state').classList.remove('hidden');
-    
-    currentResults = [];
-    for (let i = 0; i < ids.length; i++) {
-        const d = DIMENSIONS.find(x => x.id === ids[i]);
-        document.getElementById('loading-message').textContent = `Extracting evidence for ${d.title}...`;
-        document.getElementById('loading-percent').textContent = `${Math.round(((i+1)/ids.length)*100)}%`;
-        
-        const chunks = extractVerbatimChunks(currentReportData, d);
-        const score = determineScore(chunks, d);
-        
-        let allKWs = new Set();
-        chunks.forEach(c => c.keywords.forEach(k => allKWs.add(k)));
-        
-        currentResults.push({
-            question_id: d.id, 
-            question: d.title,
-            chunks: chunks,
-            score: score,
-            found_keywords: Array.from(allKWs)
-        });
-        
-        // Simulate processing delay for UI
-        await new Promise(r => setTimeout(r, 300));
+const getDimensionIcon = (title) => {
+    if (!title) return "box";
+    const t = title.toLowerCase();
+    if (t.includes("purpose") || t.includes("vision")) return "target";
+    if (t.includes("culture") || t.includes("value")) return "smile";
+    if (t.includes("workforce") || t.includes("people")) return "users";
+    if (t.includes("external") || t.includes("outsourced")) return "globe";
+    if (t.includes("segmentation") || t.includes("stakeholder")) return "pie-chart";
+    if (t.includes("community") || t.includes("nurture")) return "heart";
+    if (t.includes("collaboration") || t.includes("networking")) return "share-2";
+    if (t.includes("algorithm") || t.includes("ai")) return "cpu";
+    if (t.includes("data") || t.includes("sharing")) return "database";
+    if (t.includes("technology") || t.includes("disruptive")) return "zap";
+    if (t.includes("asset")) return "hard-drive";
+    if (t.includes("utilization") || t.includes("efficiency")) return "activity";
+    if (t.includes("engagement")) return "message-circle";
+    if (t.includes("social")) return "at-sign";
+    if (t.includes("risk") || t.includes("sustainability")) return "shield-alert";
+    if (t.includes("process") || t.includes("workflow")) return "git-branch";
+    if (t.includes("objective") || t.includes("performance") || t.includes("okr")) return "bar-chart-3";
+    if (t.includes("innovation") || t.includes("sprint")) return "lightbulb";
+    return "layers";
+};
+
+
+const closeModal = () => {
+    document.getElementById('details-modal').classList.add('hidden');
+};
+
+// Click outside to close logic
+window.onclick = function(event) {
+    const modal = document.getElementById('details-modal');
+    if (event.target == modal) {
+        closeModal();
     }
-    
-    document.getElementById('loading-state').classList.add('hidden');
-    document.getElementById('results-dashboard').classList.remove('hidden');
-    renderResults(currentResults);
 };
+
+const truncate = (str, n) => (str && str.length > n) ? str.substr(0, n - 1) + '...' : (str || "");
 
 window.onload = init;

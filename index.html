@@ -3,15 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MIE | Deterministic Engine</title>
+    <title>MIE | Enterprise Analysis Engine</title>
     <link rel="stylesheet" href="style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
 </head>
 <body>
     <div class="app-container">
@@ -19,64 +16,74 @@
         <header class="app-header">
             <div class="logo-section">
                 <div class="logo-icon-box"><i data-lucide="shield-check"></i></div>
-                <h1>MIE <span style="font-size:14px; opacity:0.6; font-weight:400; margin-left:8px;">| Verifiable Deterministic Mode</span></h1>
+                <h1>MIE <span style="font-size:14px; opacity:0.3; font-weight:400; margin-left:8px;">| Enterprise Analysis v2.0</span></h1>
             </div>
             <div class="header-controls">
-                <span class="dim-pill" style="background:#e8f5e9; color:#2e7d32; border:1px solid #a5d6a7;"><i data-lucide="lock" style="width:14px;height:14px;margin-right:6px;"></i>100% Local (No API)</span>
+                <span class="dim-pill" style="background:#1a1c1b; color:#0e8; border:1px solid #064;"><i data-lucide="zap" style="width:14px;height:14px;margin-right:6px;"></i>High-Fidelity Mode</span>
             </div>
         </header>
 
         <main class="app-main">
             <!-- Intake Hub -->
-            <section id="hero-hub" class="intake-grid">
+            <article id="hero-hub" class="intake-grid">
                 <div class="bento-card dark">
-                    <div class="icon-chip"><i data-lucide="upload-cloud" style="color:#000;"></i></div>
-                    <h2 class="card-title" style="font-size: 28px; margin-bottom: 8px;">Auditable Document Intake</h2>
-                    <p style="opacity:0.6; font-size:14px; margin-bottom: 24px;">Upload annual reports. Engine strictly extracts verbatim text according to heuristic rules. Zero hallucination.</p>
+                    <div class="icon-chip neon"><i data-lucide="upload-cloud" style="color:#000;"></i></div>
+                    <h2 class="card-title" style="font-size: 32px; margin-bottom: 12px; letter-spacing: -1px;">Report Intake</h2>
+                    <p style="opacity:0.4; font-size:14px; margin-bottom: 24px; line-height: 1.6;">Upload a corporate annual report. The 5-step engine extracts verbatim evidence without hallucination.</p>
                     
                     <div class="drop-zone" id="drop-zone">
                         <i data-lucide="file-text" style="opacity:0.5; margin-bottom:16px;"></i>
-                        <p style="font-size:14px; font-weight:600;">Click to browse reports</p>
-                        <input type="file" id="file-input" style="position:absolute; opacity:0; width:100%; height:100%; top:0; left:0; cursor:pointer">
+                        <p style="font-size:14px; font-weight:600;">Drop PDF or click to browse</p>
+                        <input type="file" id="file-input" accept="application/pdf" style="position:absolute; opacity:0; width:100%; height:100%; top:0; left:0; cursor:pointer">
                     </div>
                     
-                    <button id="analyze-btn" class="primary-pill-btn" style="background:var(--accent-green); color:black; margin-top:32px; width:100%; border-radius: 16px;" disabled>
-                        Begin Extraction Pipeline
-                        <i data-lucide="play-circle"></i>
+                    <button id="analyze-btn" class="primary-pill-btn" style="background:var(--accent-green); color:black; margin-top:32px; width:100%; border-radius: 12px;" disabled>
+                        Initialize Analysis
+                        <i data-lucide="terminal"></i>
                     </button>
                 </div>
 
-                <div class="bento-card" style="background: white;">
-                    <div class="icon-chip neon" style="background: var(--accent-purple);"><i data-lucide="list-checks" style="color:#fff;"></i></div>
-                    <h2 class="card-title" style="font-size: 28px; margin-bottom: 8px;">Framework Constants</h2>
-                    <p style="color:var(--text-muted); font-size:14px; margin-bottom:32px;">Select maturity pillars. System will strictly pull verbatim evidence for each.</p>
+                <div class="bento-card dark">
+                    <div class="icon-chip" style="background: var(--accent-purple);"><i data-lucide="sliders" style="color:#000;"></i></div>
+                    <h2 class="card-title" style="font-size: 32px; margin-bottom: 12px; letter-spacing: -1px;">Extraction Profile</h2>
+
+                    <p style="margin-bottom:32px; line-height: 1.6;">Configure the maturity pillars for the deterministic extraction engine to target.</p>
+
                     
                     <div class="dimensions-selector" id="dimensions-list">
                         <!-- Populated via JS -->
                     </div>
                 </div>
-            </section>
+            </article>
 
             <!-- Loading State -->
             <section id="loading-state" class="hidden" style="text-align: center; padding: 100px 0;">
-                <div class="icon-chip neon" style="width: 80px; height: 80px; margin: 0 auto 32px; background:var(--accent-green);"><i data-lucide="cpu" style="width:32px; height:32px; color:black;"></i></div>
-                <h2 id="loading-message" style="font-size:24px;">Running Deterministic Pipeline...</h2>
-                <div style="font-size: 48px; font-weight: 700; margin-top: 16px;" id="loading-percent">...</div>
+                <div class="loader-container">
+                    <div class="loader-ring"></div>
+                    <div class="loader-scanner"></div>
+                    <div class="loader-binary">
+                        <span id="progress-pct" style="display:block; font-size: 32px; font-weight: 900; line-height: 1;">0%</span>
+                        <span style="font-size: 10px; text-transform: uppercase; letter-spacing: 2px; opacity: 0.6; margin-top: 4px;">Analyzing</span>
+                    </div>
+                </div>
+                <h2 id="loading-message" style="font-size:32px; color: var(--accent-green); margin-bottom: 8px;">Deterministic Engine Sequencing...</h2>
+                <p id="loading-sub" style="opacity:0.4; font-size:14px;">Analyzing PDF structure & verbatim extraction</p>
             </section>
 
-            <!-- Results Dashboard (Bento Grid) -->
+
+            <!-- Results Dashboard -->
             <section id="results-dashboard" class="hidden">
-                <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 32px;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 40px;">
                     <div>
-                        <h2 style="font-size:32px; letter-spacing: -1px;">Extraction Results</h2>
-                        <p style="opacity: 0.5; font-size: 14px; font-weight: 500; margin-top: 4px;">Zero-hallucination insights. Click a card for verbatim audit logs.</p>
+                        <h2 style="font-size:40px; letter-spacing: -1.5px; margin-bottom: 4px;">Analysis Results</h2>
+                        <span style="opacity: 0.3; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 2px;">AUDIT-READY VERBATIM OUTPUT</span>
                     </div>
                     <div style="display: flex; gap: 12px;">
-                        <button id="export-json" class="primary-pill-btn" style="padding: 12px 24px; font-size:14px; border-radius:12px;">Export JSON</button>
+                        <button id="reset-btn" class="primary-pill-btn" style="background: transparent; color: white; border: 1px solid #333; padding: 12px 24px; font-size:14px;" onclick="window.location.reload()">Start New</button>
+                        <button id="export-json" class="primary-pill-btn" style="padding: 12px 24px; font-size:14px; background: white; color: #000;">Export Report JSON</button>
                     </div>
                 </div>
                 
-                <!-- The Bento Grid Container -->
                 <div class="results-matrix" id="audit-bento-grid">
                     <!-- Cards populated via JS -->
                 </div>
@@ -86,14 +93,15 @@
 
     <!-- Details Modal -->
     <div id="details-modal" class="modal hidden">
-        <div class="modal-content">
-            <button id="close-modal" class="close-btn"><i data-lucide="x"></i></button>
+        <div class="modal-content" style="background: #000; border: 1px solid rgba(255,255,255,0.1); border-radius: 24px; color: white; padding: 40px; max-width: 900px;">
+            <button id="close-modal" class="close-btn" style="top: 24px; right: 24px; color: white;"><i data-lucide="x"></i></button>
             <div id="modal-body">
                 <!-- Inner populated by JS -->
             </div>
         </div>
     </div>
 
-    <script src="js/app.js?v=8"></script>
+
+    <script src="js/app.js"></script>
 </body>
 </html>
