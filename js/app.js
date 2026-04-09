@@ -1,20 +1,20 @@
 /**
- * MIE Enterprise Analysis Engine — Frontend Orchestrator
- * Connects to Backend v2.1 (Port 4242)
+ * MIE Enterprise Analysis Engine — Frontend Orchestrator v2.5
  */
 
 const API_BASE = 'http://localhost:4242/api';
 let currentResults = null;
-let currentDimensions = [];
+let currentActiveQuestion = null;
 
-/**
- * INIT
- */
+const THEME_COLORS = [
+    '#00ff88', '#00ddeb', '#a29bfe', '#f0db4f', '#ff6b6b', '#ffa502', 
+    '#74b9ff', '#fd79a8', '#55efc4', '#e17055', '#b2bec3', '#6c5ce7'
+];
+
 const init = async () => {
     lucide.createIcons();
     await fetchDimensions();
-    
-    // UI Bindings
+
     const fileInput = document.getElementById('file-input');
     const analyzeBtn = document.getElementById('analyze-btn');
     const dropZone = document.getElementById('drop-zone');
@@ -22,29 +22,25 @@ const init = async () => {
     fileInput.addEventListener('change', (e) => {
         if (e.target.files.length > 0) {
             const file = e.target.files[0];
-            dropZone.querySelector('p').textContent = `Ready: ${file.name}`;
+            dropZone.querySelector('p').textContent = `✓ Ready: ${file.name}`;
             dropZone.style.borderColor = 'var(--accent-green)';
+            dropZone.style.background = 'rgba(0,255,136,0.05)';
             analyzeBtn.disabled = false;
         }
     });
 
     analyzeBtn.addEventListener('click', startAnalysis);
 
-    // Modal Close
     document.getElementById('close-modal').onclick = () => {
         document.getElementById('details-modal').classList.add('hidden');
     };
 };
 
-/**
- * FETCH DIMENSIONS
- */
 const fetchDimensions = async () => {
     try {
         const res = await fetch(`${API_BASE}/dimensions`);
         const data = await res.json();
         if (data.success) {
-            currentDimensions = data.dimensions;
             renderDimensionsSelector(data.dimensions);
         }
     } catch (err) {
@@ -54,46 +50,40 @@ const fetchDimensions = async () => {
 
 const renderDimensionsSelector = (dims) => {
     const list = document.getElementById('dimensions-list');
-    list.innerHTML = dims.map(d => `
+    const themes = [];
+    dims.forEach(d => {
+        if (!themes.find(t => t.id === d.id)) themes.push({ id: d.id, title: d.title });
+    });
+
+    list.innerHTML = themes.map((t, i) => `
         <label class="dim-pill">
-            <input type="checkbox" name="dimension" value="${d.id}" checked>
-            <span>${d.title}</span>
+            <input type="checkbox" name="dimension" value="${t.id}" checked>
+            <span>Theme ${t.id}: ${t.title}</span>
         </label>
     `).join('');
 };
 
-/**
- * START ANALYSIS
- */
 const startAnalysis = async () => {
     const fileInput = document.getElementById('file-input');
-    const selectedDims = Array.from(document.querySelectorAll('input[name="dimension"]:checked')).map(i => i.value);
-    
+    const selectedDims = Array.from(document.querySelectorAll('input[name="dimension"]:checked'))
+        .map(i => i.value);
+
     if (!fileInput.files[0]) return;
 
-    // UI Flip
     document.getElementById('hero-hub').classList.add('hidden');
     document.getElementById('loading-state').classList.remove('hidden');
-    document.getElementById('loading-message').textContent = 'Extracting Verbatim Evidence...';
 
     const formData = new FormData();
     formData.append('pdf', fileInput.files[0]);
     formData.append('dimensions', selectedDims.join(','));
 
     try {
-        // Start Progress Animation (0 to 100)
-        let progress = 0;
         const progressEl = document.getElementById('progress-pct');
+        let progress = 0;
         const progressInterval = setInterval(() => {
-            if (progress < 80) {
-                progress += Math.random() * 4; // Fast data retrieval phase
-            } else if (progress < 96) {
-                progress += Math.random() * 0.8; // Intensive extraction phase
-            } else if (progress < 99) {
-                progress += 0.05; // Final synthesis phase
-            }
+            if (progress < 95) progress += Math.random() * 2;
             if (progressEl) progressEl.innerText = Math.floor(progress) + '%';
-        }, 400);
+        }, 500);
 
         const response = await fetch(`${API_BASE}/analyse`, {
             method: 'POST',
@@ -101,20 +91,16 @@ const startAnalysis = async () => {
         });
 
         const data = await response.json();
-        
-        // Finalize
         clearInterval(progressInterval);
         if (progressEl) progressEl.innerText = '100%';
 
         if (data.success) {
             currentResults = data.results;
-            
-            // Short delay to show 100% before transitioning
             setTimeout(() => {
                 document.getElementById('loading-state').classList.add('hidden');
                 document.getElementById('results-dashboard').classList.remove('hidden');
-                renderResultsGrid(data.results);
-            }, 600);
+                renderResultsGrid(data.results, data.meta);
+            }, 500);
         } else {
             throw new Error(data.error || 'Analysis failed');
         }
@@ -125,179 +111,144 @@ const startAnalysis = async () => {
     }
 };
 
-
-/**
- * RENDER RESULTS
- * Reverted to 7 Strategic Pillars (with 25-point logic)
- */
-const renderResultsGrid = (results) => {
+const renderResultsGrid = (results, meta) => {
     const grid = document.getElementById('audit-bento-grid');
     grid.innerHTML = '';
 
-    results.forEach((res, index) => {
-        const card = document.createElement('div');
-        card.className = 'result-card lift-animate';
-        
-        const title = res["Attribute"] || `Pillar ${index + 1}`;
-        const scoreVal = res["Score"]; 
-        const numericScore = typeof scoreVal === 'number' ? scoreVal : 0;
-        
-        // Refined 7-Pillar Colors
-        const pillarColors = [
-            '#00ff88', // Purpose (Neon Green)
-            '#00ddeb', // Staff (Cyan)
-            '#a29bfe', // Community (Purple)
-            '#f0db4f', // Algorithms (Yellow)
-            '#ff6b6b', // Assets (Pink)
-            '#ffa502', // Engagement (Orange)
-            '#74b9ff'  // Strategy (Sky Blue)
-        ];
-        const categoryColor = pillarColors[index] || pillarColors[0];
-        const icon = getDimensionIcon(title);
-        const levelLabel = res["Level"];
+    const grouped = {};
+    results.forEach(r => {
+        const theme = r.Theme || 'Standard';
+        if (!grouped[theme]) grouped[theme] = [];
+        grouped[theme].push(r);
+    });
 
-        card.innerHTML = `
-            <div class="rc-top">
-                <div class="rc-header">
-                    <div class="rc-icon" style="background: ${categoryColor}22">
-                        <i data-lucide="${icon}" style="color: ${categoryColor}"></i>
-                    </div>
-                    <span style="font-size: 10px; color: ${categoryColor}; letter-spacing: 1px; font-weight: 900;">PILLAR 0${index + 1}</span>
-                </div>
-                <h3 class="rc-title" style="color: white; margin-top: 12px; font-size: 18px;">${title}</h3>
-                <ul class="rc-bullets">
-                    <li style="color: ${categoryColor}; font-weight: 700; font-size: 13px;">${levelLabel}</li>
-                    <li style="font-style: italic; opacity: 0.5; font-size: 11px; margin-top: 8px; line-height: 1.4;">"${truncate(res["Most Representative Statement"], 95)}"</li>
-                </ul>
+    Object.entries(grouped).forEach(([themeName, questions], idx) => {
+        const color = THEME_COLORS[idx % THEME_COLORS.length];
+        
+        const section = document.createElement('div');
+        section.className = 'theme-section';
+        section.innerHTML = `
+            <div style="background:${color}11; padding:20px; border-radius:12px; margin-bottom:12px; border:1px solid ${color}33">
+                <h3 style="color:${color}; font-size:18px;">${themeName}</h3>
             </div>
-            <div class="rc-score-box" style="border-top-color: rgba(255,255,255,0.05); background: rgba(255,255,255,0.02)">
-                <span style="color: rgba(255,255,255,0.3); font-size: 10px; letter-spacing: 1px;">MATURITY SCORE</span>
-                <span style="color: ${categoryColor}; font-size: 20px; font-weight: 900;">${typeof scoreVal === 'number' ? scoreVal + '.0' : 'N/A'}</span>
-            </div>
+            <div class="questions-grid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap:12px; margin-bottom:32px;"></div>
         `;
 
-        card.onclick = () => openDetails(res);
-        grid.appendChild(card);
+        const qGrid = section.querySelector('.questions-grid');
+        questions.forEach(q => {
+            const card = document.createElement('div');
+            card.className = 'result-card';
+            card.style.cssText = `background:white; color:black; padding:20px; border-radius:12px; cursor:pointer; border:1px solid #eee; transition: transform 0.2s;`;
+            card.onmouseover = () => card.style.transform = 'scale(1.02)';
+            card.onmouseout = () => card.style.transform = 'scale(1)';
+            
+            card.innerHTML = `
+                <div style="font-size:11px; color:#888; margin-bottom:8px; font-weight:700;">${q.QuestionID}</div>
+                <div style="font-weight:700; font-size:14px; margin-bottom:12px; height: 40px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">${q.Question}</div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-top: auto;">
+                    <span style="background:${q.LevelColor}; color:white; padding:4px 12px; border-radius:20px; font-weight:800; font-size:11px; text-transform: uppercase;">${q.Level.split('(')[1].replace(')', '')}</span>
+                    <span style="font-size:24px; font-weight:900; color:${q.LevelColor}">${q.Score}.0</span>
+                </div>
+            `;
+            card.onclick = () => openDetails(q);
+            qGrid.appendChild(card);
+        });
+
+        grid.appendChild(section);
     });
+
     lucide.createIcons();
 };
 
-
-
-/**
- * OPEN DETAILS MODAL
- * CRITICAL FIX: Use the Correct Field Names
- */
-const openDetails = (res) => {
+const openDetails = (q) => {
+    currentActiveQuestion = q;
     const modal = document.getElementById('details-modal');
     const body = document.getElementById('modal-body');
-    const title = res["Attribute"];
-    const scoreVal = res["Score"];
-    const numericScore = typeof scoreVal === 'number' ? scoreVal : 0;
-    const color = getLevelColor(numericScore);
-
-    // Extract Statement list builder
-    let extractListHtml = '';
-    let i = 1;
-    while(res[`Extract Statement ${i}`]) {
-        extractListHtml += `
-            <div style="background: #f9f9f9; border: 1px solid #eee; padding: 20px; border-radius: 16px; margin-bottom: 12px;">
-                <div style="font-weight: 800; color: #888; font-size: 10px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px;">Extract Statement ${i}</div>
-                <div style="font-family: 'Inter', sans-serif; font-style: italic; line-height: 1.6; color: #111;">
-                    "${res[`Extract Statement ${i}`]}"
-                </div>
-            </div>
-        `;
-        i++;
-    }
-
+    
+    // UI Style: White background, Black text, Sans-serif font (Inter)
     body.innerHTML = `
-        <div style="border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 24px; margin-bottom: 32px;">
-            <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 16px;">
-                <div class="rc-icon" style="width: 48px; height: 48px; background: ${color}22">
-                    <i data-lucide="${getDimensionIcon(title)}" style="color: ${color}"></i>
-                </div>
-                <h2 style="font-size: 28px; color: white;">${title}</h2>
-            </div>
-            <div style="display: flex; gap: 12px;">
-                <span style="background: ${color}; color: #000; padding: 4px 12px; border-radius: 8px; font-weight: 800; font-size: 12px;">
-                    ${res["Level"]}
-                </span>
-            </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
+            <h2 style="color:white; margin:0; font-size:22px;">Audit Intelligence: ${q.QuestionID}</h2>
+            <button id="copy-report-btn" style="background: var(--accent-green); color: black; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 700; cursor: pointer; display:flex; align-items:center; gap:8px;">
+                <i data-lucide="copy" style="width:16px;"></i> Copy Report
+            </button>
         </div>
 
-        <section style="margin-bottom: 40px;">
-            <h4 style="font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: rgba(255,255,255,0.4); margin-bottom: 16px;">Summary Statement</h4>
-            <div style="font-size: 14px; line-height: 1.8; color: white; white-space: pre-wrap; font-weight: 300;">${res["Summary Statement"]}</div>
-        </section>
-
-        <section style="margin-bottom: 40px;">
-            <h4 style="font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: rgba(255,255,255,0.4); margin-bottom: 16px;">Justification for Level</h4>
-            <div style="color: white; border-left: 4px solid ${color}; padding: 20px; font-size: 14px; line-height: 1.6; white-space: pre-wrap; background: rgba(255,255,255,0.03); border-radius: 0 4px 4px 0;">${res["Justification for Level"]}</div>
-        </section>
-
-        <section style="margin-bottom: 40px;">
-            <h4 style="font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: rgba(255,255,255,0.4); margin-bottom: 16px;">Why other statements are not relevant</h4>
-            <div style="color: rgba(255,255,255,0.7); background: rgba(255,255,255,0.02); padding: 20px; border-radius: 12px; font-size: 13.5px; border: 1px solid rgba(255,255,255,0.05); white-space: pre-wrap;">${res["Justification as to why other statements are not relevant"]}</div>
-        </section>
-
-        <section>
-            <h4 style="font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: rgba(255,255,255,0.4); margin-bottom: 16px;">Direct Verbatim Audit Log</h4>
-            <div style="max-height: 400px; overflow-y: auto; padding-right: 12px;">
-                ${extractListHtml || '<p style="opacity: 0.5;">No statements found.</p>'}
+        <div style="background:white; color:black; border-radius:16px; padding:32px; font-family:'Inter', sans-serif; box-shadow: 0 20px 40px rgba(0,0,0,0.3); max-height: 70vh; overflow-y: auto;">
+            
+            <div class="report-row" style="margin-bottom:24px;">
+                <label style="display:block; text-transform:uppercase; font-size:11px; font-weight:800; color:#888; margin-bottom:6px; letter-spacing:1px;">Attribute</label>
+                <div style="font-size:18px; font-weight:700;">${q.Attribute}</div>
             </div>
-        </section>
+
+            <div class="report-row" style="margin-bottom:24px;">
+                <label style="display:block; text-transform:uppercase; font-size:11px; font-weight:800; color:#888; margin-bottom:6px; letter-spacing:1px;">Questions</label>
+                <div style="font-size:18px; font-weight:700;">${q.Question}</div>
+            </div>
+
+            <div class="report-row" style="margin-bottom:24px;">
+                <label style="display:block; text-transform:uppercase; font-size:11px; font-weight:800; color:#888; margin-bottom:6px; letter-spacing:1px;">Most Representative Statement</label>
+                <div style="font-style:italic; line-height:1.6; color:#333;">${q["Most Representative Statement"]}</div>
+            </div>
+
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px; margin-bottom:24px; padding-bottom:24px; border-bottom: 1px solid #eee;">
+                <div>
+                    <label style="display:block; text-transform:uppercase; font-size:11px; font-weight:800; color:#888; margin-bottom:6px; letter-spacing:1px;">Score</label>
+                    <div style="font-size:32px; font-weight:900; color:${q.LevelColor}">${q.Score}.0</div>
+                </div>
+                <div>
+                    <label style="display:block; text-transform:uppercase; font-size:11px; font-weight:800; color:#888; margin-bottom:6px; letter-spacing:1px;">Level</label>
+                    <div style="font-size:18px; font-weight:700;">${q.Level}</div>
+                </div>
+            </div>
+
+            <div class="report-row" style="margin-bottom:24px;">
+                <label style="display:block; text-transform:uppercase; font-size:11px; font-weight:800; color:#888; margin-bottom:12px; letter-spacing:1px;">Justification for Level</label>
+                <div style="line-height:1.7; color:#444; white-space:pre-wrap;">${q["Justification for Level"]}</div>
+            </div>
+
+            <div class="report-row" style="margin-bottom:24px;">
+                <label style="display:block; text-transform:uppercase; font-size:11px; font-weight:800; color:#888; margin-bottom:12px; letter-spacing:1px;">Justification as to why other statements are not relevant</label>
+                <div style="line-height:1.7; color:#444; white-space:pre-wrap;">${q["Justification as to why other statements are not relevant"]}</div>
+            </div>
+
+            <div class="report-row" style="background:#f8f9fa; padding:24px; border-radius:12px; border:1px solid #eee; margin-bottom:24px;">
+                <label style="display:block; text-transform:uppercase; font-size:11px; font-weight:800; color:#888; margin-bottom:12px; letter-spacing:1px;">Summary Statement</label>
+                <div style="line-height:1.8; color:#222; font-size:15px; white-space:pre-wrap;">${q["Summary Statement"]}</div>
+            </div>
+
+            <div class="extracts-section">
+                <label style="display:block; text-transform:uppercase; font-size:11px; font-weight:800; color:#888; margin-bottom:16px; letter-spacing:1px;">Extract Statements (Audit Evidence)</label>
+                <div id="extract-list-container"></div>
+            </div>
+        </div>
     `;
+
+    // Render extracts (Exactly 1-6)
+    const extractContainer = body.querySelector('#extract-list-container');
+    let extractHtml = '';
+    for(let i=1; i<=6; i++) {
+        if(q[`Extract Statement ${i}`]) {
+            extractHtml += `
+                <div style="margin-bottom:16px; padding:16px; border-left:4px solid ${q.LevelColor}; background:#fafafa; border-radius:0 8px 8px 0;">
+                    <div style="font-size:10px; font-weight:800; color:#aaa; text-transform:uppercase; margin-bottom:4px;">Extract ${i} (Page ${q[`Extract Page ${i}`]})</div>
+                    <div style="font-size:13px; color:#333; line-height:1.6; font-style:italic;">"${q[`Extract Statement ${i}`]}"</div>
+                </div>
+            `;
+        }
+    }
+    extractContainer.innerHTML = extractHtml || '<div style="color:#aaa; font-style:italic;">No extracts identified.</div>';
+
+    document.getElementById('copy-report-btn').onclick = () => copyToClipboard(currentActiveQuestion.exactFormat);
 
     modal.classList.remove('hidden');
     lucide.createIcons();
 };
 
-/**
- * UTILS
- */
-const getLevelColor = (lvl) => {
-    const colors = ['#888', '#ff4444', '#ffcc00', '#5dc9ff', '#9d83ff', '#00ff88'];
-    return colors[lvl] || colors[0];
+const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text).then(() => {
+        alert('Audit report copied to clipboard!');
+    });
 };
-
-const getDimensionIcon = (title) => {
-    if (!title) return "box";
-    const t = title.toLowerCase();
-    if (t.includes("purpose") || t.includes("vision")) return "target";
-    if (t.includes("culture") || t.includes("value")) return "smile";
-    if (t.includes("workforce") || t.includes("people")) return "users";
-    if (t.includes("external") || t.includes("outsourced")) return "globe";
-    if (t.includes("segmentation") || t.includes("stakeholder")) return "pie-chart";
-    if (t.includes("community") || t.includes("nurture")) return "heart";
-    if (t.includes("collaboration") || t.includes("networking")) return "share-2";
-    if (t.includes("algorithm") || t.includes("ai")) return "cpu";
-    if (t.includes("data") || t.includes("sharing")) return "database";
-    if (t.includes("technology") || t.includes("disruptive")) return "zap";
-    if (t.includes("asset")) return "hard-drive";
-    if (t.includes("utilization") || t.includes("efficiency")) return "activity";
-    if (t.includes("engagement")) return "message-circle";
-    if (t.includes("social")) return "at-sign";
-    if (t.includes("risk") || t.includes("sustainability")) return "shield-alert";
-    if (t.includes("process") || t.includes("workflow")) return "git-branch";
-    if (t.includes("objective") || t.includes("performance") || t.includes("okr")) return "bar-chart-3";
-    if (t.includes("innovation") || t.includes("sprint")) return "lightbulb";
-    return "layers";
-};
-
-
-const closeModal = () => {
-    document.getElementById('details-modal').classList.add('hidden');
-};
-
-// Click outside to close logic
-window.onclick = function(event) {
-    const modal = document.getElementById('details-modal');
-    if (event.target == modal) {
-        closeModal();
-    }
-};
-
-const truncate = (str, n) => (str && str.length > n) ? str.substr(0, n - 1) + '...' : (str || "");
 
 window.onload = init;

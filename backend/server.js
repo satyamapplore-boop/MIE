@@ -29,13 +29,30 @@ const upload = multer({
 app.get('/health', (req, res) => res.json({ status: 'ok', engine: 'v2.1' }));
 
 app.get('/api/dimensions', (req, res) => {
-    const dims = getDimensions().map(d => ({
-        id: d.id,
-        title: d.title,
-        question: d.question,
-        rubric: d.rubric.map(r => ({ level: r.l, label: r.t, criteria: r.d }))
-    }));
-    res.json({ success: true, dimensions: dims });
+    try {
+        const rawDims = getDimensions();
+        if (!rawDims || !Array.isArray(rawDims)) {
+            console.error('[MIE] getDimensions() returned invalid data:', rawDims);
+            return res.status(500).json({ success: false, error: 'Invalid dimension data' });
+        }
+
+        const dims = rawDims.map(d => {
+            if (!d.rubric) {
+                console.warn(`[MIE] Dimension ${d.question} missing rubric`);
+                return { id: d.id, title: d.title, question: d.question, rubric: [] };
+            }
+            return {
+                id: d.id,
+                title: d.title,
+                question: d.question,
+                rubric: d.rubric.map(r => ({ level: r.l, label: r.t, criteria: r.d }))
+            };
+        });
+        res.json({ success: true, dimensions: dims });
+    } catch (err) {
+        console.error('[MIE_DIM_ERR]', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
 });
 
 /**

@@ -1,104 +1,86 @@
 /**
- * MIE Extraction Engine
- * Step 1: Zero-hallucination verbatim extraction from parsed PDF pages.
- * Groups sentence-level matches into extracts with page references.
+ * MIE Extraction Engine v6.0
+ * Returns INDIVIDUAL SENTENCE-LEVEL extracts (verbatim, not page-grouped).
+ * Each extract is a single matching sentence with page reference.
  */
 
-/**
- * extractVerbatimStatements
- * @param {Array} pages - Array of { page: number, text: string } from PDF parser
- * @param {Object} dimension - Dimension config with keywords and triggers
- * @returns {Array} extracts - Array of { text, page, matchScore, matchedKeywords }
- */
 const extractVerbatimStatements = (pages, dimension) => {
     const allKeywords = [
         ...dimension.keywords.map(k => k.toLowerCase()),
         ...dimension.triggers.map(k => k.toLowerCase())
     ];
 
-    const extractMap = new Map(); // keyed by page number
+    const seen = new Set();
+    const extracts = [];
 
     pages.forEach(({ page, text }) => {
-        // Split text into sentence-level segments
+        // Split into individual sentences
         const sentences = text
             .replace(/\n+/g, ' ')
             .split(/(?<=[.!?])\s+/)
             .map(s => s.trim())
-            .filter(s => s.length >= 40); // minimum meaningful length
+            .filter(s => s.length >= 40 && s.length <= 1200);
 
         sentences.forEach(sentence => {
             const lower = sentence.toLowerCase();
+            let matchScore = 0;
             const matched = [];
 
             allKeywords.forEach(kw => {
                 const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                // Regex: match keyword with flexible boundaries (allow punctuation or spaces around it)
-                const pattern = new RegExp(`${escaped}`, 'i');
+                const pattern = new RegExp(escaped, 'i');
                 if (pattern.test(lower)) {
+                    matchScore++;
                     matched.push(kw);
                 }
             });
 
+            // Trigger phrases get boosted score
+            dimension.triggers.forEach(trigger => {
+                if (lower.includes(trigger.toLowerCase())) {
+                    matchScore += 3;
+                }
+            });
 
-            if (matched.length > 0) {
-                if (!extractMap.has(page)) {
-                    extractMap.set(page, {
+            if (matchScore > 0) {
+                // Deduplicate by normalized text
+                const normalized = sentence.replace(/\s+/g, ' ').toLowerCase().substring(0, 80);
+                if (!seen.has(normalized)) {
+                    seen.add(normalized);
+                    extracts.push({
+                        text: sentence,
                         page,
-                        sentences: [],
-                        matchScore: 0,
-                        matchedKeywords: new Set()
+                        matchScore,
+                        matchedKeywords: matched
                     });
                 }
-                const entry = extractMap.get(page);
-                // Avoid duplicate sentences
-                if (!entry.sentences.includes(sentence)) {
-                    entry.sentences.push(sentence);
-                }
-                entry.matchScore += matched.length;
-                matched.forEach(k => entry.matchedKeywords.add(k));
             }
         });
     });
 
-    // Convert to array and build final extract objects
-    const extracts = Array.from(extractMap.values())
-        .map(entry => ({
-            page: entry.page,
-            text: entry.sentences.join(' '),
-            matchScore: entry.matchScore,
-            matchedKeywords: Array.from(entry.matchedKeywords)
-        }))
-        .sort((a, b) => a.page - b.page); // chronological order
-
-    return extracts;
+    // Sort by relevance (match score desc), then by page
+    return extracts
+        .sort((a, b) => b.matchScore - a.matchScore || a.page - b.page);
 };
 
 /**
  * selectMostRepresentativeStatement
- * Picks the highest-scoring extract and prefixes it with context from the
- * second-highest if available, to form a synthesis combining multiple extracts.
- *
- * @param {Array} extracts
- * @returns {string}
+ * Picks the top 2 highest-scoring sentences and fuses them into one representative statement.
  */
 const selectMostRepresentativeStatement = (extracts) => {
-    if (!extracts || extracts.length === 0) return "no relevant content found";
+    if (!extracts || extracts.length === 0) return 'no relevant content found';
 
-    // Sort by match score descending
     const sorted = [...extracts].sort((a, b) => b.matchScore - a.matchScore);
     const best = sorted[0];
 
-    // Truncate to 500 chars max to keep it representative, not exhaustive
-    const truncate = (str, max) => str.length > max ? str.substring(0, max).trimEnd() + '...' : str;
-
     if (sorted.length === 1) {
-        return truncate(best.text, 500);
+        return best.text.length > 500 ? best.text.substring(0, 500).trimEnd() + '...' : best.text;
     }
 
-    // Attempt to fuse best + second-best if they differ meaningfully
     const second = sorted[1];
-    const combined = `${truncate(best.text, 300)} [...] ${truncate(second.text, 200)}`;
-    return combined;
+    const t1 = best.text.length > 280 ? best.text.substring(0, 280).trimEnd() + '...' : best.text;
+    const t2 = second.text.length > 200 ? second.text.substring(0, 200).trimEnd() + '...' : second.text;
+    return `${t1} [...] ${t2}`;
 };
 
 module.exports = { extractVerbatimStatements, selectMostRepresentativeStatement };
