@@ -62,8 +62,6 @@ const buildSummary = (question, extracts, scoreData) => {
     }
 
     const questionTitle = question.title || 'this dimension';
-    const firstExtract = extracts[0];
-    const top3 = extracts.slice(0, 3);
 
     // Safe rubric accessor for the "next level"
     const getRubricCriteria = (idx) => {
@@ -73,27 +71,28 @@ const buildSummary = (question, extracts, scoreData) => {
 
     let summary = `ANNUAL REPORT EVALUATION BRIEF: ${questionTitle.toUpperCase()}\n\n`;
 
-    // SECTION 1: CORE VISION AND STRATEGIC CONTEXT
-    summary += `CORE PURPOSE AND STRATEGIC CONTEXT\n`;
-    summary += `The organization's explicit posture regarding "${questionTitle}" is central to its reported sustainability and impact strategy. This assessment, concluding in a Level ${scoreData.score} (${scoreData.label}) maturity state, is substantiated by a deterministic mapping of verbatim disclosures against the industry-standard maturity rubric. The primary anchor statement—"${firstExtract.text}" (Page ${firstExtract.page})—establishes a forward-looking baseline that balances operational intent with strategic stakeholder value.\n\n`;
+    summary += `DETAILED MATURITY ANALYSIS AND STRATEGIC CONTEXT\n`;
+    summary += `The comprehensive audit of the organisation's public fiscal disclosures regarding "${questionTitle}" has culminated in a definitive maturity score of Level ${scoreData.score}. This assessment is not merely a qualitative observation but a deterministic result of mapping verbatim extracted text—preserving the raw reporting vocabulary—against the established 5-tier exponential maturity rubric. Within this framework, a Level ${scoreData.score} positioning indicates that the organisation is ${scoreData.score >= 4 ? 'not only aware of this dimension but has integrated it into the highest levels of governance and operational execution' : 'in the process of formalising its approach, moving from sporadic project-based initiatives towards a more systematic strategic alignment'}. The density of signals identified suggest a consistent narrative thread that connects local operational claims to board-level transparency commitments.\n\n`;
 
-    // SECTION 2: STRATEGIC FOCUS AND PILLAR ANALYSIS (Bulleted Tenets)
-    summary += `STRATEGIC FOCUS AND MISSION TENETS\n`;
-    summary += `At its core, the strategy concentrates on translating organizational intent into measurable outcomes. The audit identified ${extracts.length} distinct maturity signals across ${new Set(extracts.map(e => e.page)).size} pages. Key tenets of this strategy, derived directly from the reported evidence, include:\n\n`;
+    summary += `VERBATIM EVIDENCE REVIEW AND EMPIRICAL ANCHORING\n`;
+    const firstExtract = extracts[0];
+    const sampleTexts = extracts.slice(0, 3)
+        .map(e => `"${e.text.substring(0, 160)}..."`)
+        .join(', ');
+    summary += `A total of ${extracts.length} distinct maturity signals were identified across ${new Set(extracts.map(e => e.page)).size} pages of the disclosed data. The primary anchor statement for this assessment—"${firstExtract.text}" (found on Page ${firstExtract.page})—provides a direct link between reported action and maturity criteria. Furthermore, the inclusion of phrases such as ${sampleTexts} indicates a sophisticated engagement with the thematic requirements of "${questionTitle}". These verbatim fragments are essential to the audit trail, as they provide the empirical evidence necessary to substantiating claims of ${scoreData.label} maturity.\n\n`;
 
-    const tenets = top3.map((ex, idx) => {
-        const keywords = (ex.matchedKeywords && ex.matchedKeywords.length > 0) ? ex.matchedKeywords[0].toUpperCase() : 'STRATEGIC ALIGNMENT';
-        return `• ${keywords}: The organization emphasizes that "${ex.text.substring(0, 300)}${ex.text.length > 300 ? '...' : ''}" (Page ${ex.page}). This serves as a cornerstone for its ${scoreData.label} maturity state.\n`;
-    }).join('\n');
-    summary += tenets + '\n';
+    summary += `RUBRIC ALIGNMENT AND MATURITY RATIONALE\n`;
+    const nextLevelCriteria = getRubricCriteria(Math.min(scoreData.score, 4));
+    const matchedKeywordsSample = extracts
+        .map(e => (e.matchedKeywords && e.matchedKeywords[0]) ? e.matchedKeywords[0] : 'strategic reporting')
+        .slice(0, 5)
+        .join(', ');
+    summary += `The assigned level of Level ${scoreData.score} reflects a high degree of thematic resonance with the rubric definition: "${scoreData.bestStatement}". The organisation demonstrates specific proficiency in ${matchedKeywordsSample}. This suggests that the organisational DNA is increasingly attuned to the requirements of exponential maturity. However, to progress towards a frontier Level 5 status, the disclosures would need to show more radical evidence of ${nextLevelCriteria}.\n\n`;
 
-    // SECTION 3: RUBRIC ALIGNMENT & MATURITY DRIVERS
-    summary += `RUBRIC ALIGNMENT AND MATURITY DRIVERS\n`;
-    summary += `The assigned Level ${scoreData.score} reflects a high degree of thematic resonance with the criteria: "${scoreData.bestStatement}". The organisation demonstrates specific proficiency in ${extracts.map(e => e.matchedKeywords[0] || 'reporting').slice(0, 4).join(", ")}. To progress towards a frontier Level 5 status, the disclosures would need to show more radical, ecosystem-wide transformative evidence of ${getRubricCriteria(Math.min(scoreData.score, 4))}.\n\n`;
-
-    // SECTION 4: AUDIT CONCLUSION
     summary += `LONG-TERM IMPLICATIONS AND AUDIT CONCLUSION\n`;
-    summary += `In conclusion, the current Level ${scoreData.score} assessment provides a defensible, evidence-based view of the organization's trajectory. By anchoring the analysis in raw verbatim fragments—preserving the original reporting vocabulary—this audit ensures that stakeholders can trace the logic from public disclosure to strategic conclusion. The path forward is clearly delineated by the maturity framework, offering a roadmap for future transparency and operational excellence.`;
+    const e1 = extracts[Math.min(1, extracts.length - 1)];
+    const e2 = extracts[Math.min(2, extracts.length - 1)];
+    summary += `In conclusion, the current Level ${scoreData.score} assessment provides a defensible, evidence-based view of the organisation's maturity for "${questionTitle}". By anchoring the analysis in verbatim disclosures such as "${e1.text.substring(0, 150)}..." and "${e2.text.substring(0, 130)}...", this audit report ensures that stakeholders can trace the logic from raw report data to the final strategic conclusion. This deterministic approach eliminates interpretative bias, providing a high-fidelity truth based strictly on the organisation's public accountability framework.`;
 
     return summary.trim();
 };
