@@ -58,9 +58,9 @@ const extractVerbatimStatements = (pages, dimension) => {
         });
     });
 
-    // Sort by relevance (match score desc), then by page
+    // Sort by page (ASC), then by match score (DESC)
     return extracts
-        .sort((a, b) => b.matchScore - a.matchScore || a.page - b.page);
+        .sort((a, b) => a.page - b.page || b.matchScore - a.matchScore);
 };
 
 /**

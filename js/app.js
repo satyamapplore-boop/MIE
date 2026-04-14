@@ -34,6 +34,38 @@ const init = async () => {
     document.getElementById('close-modal').onclick = () => {
         document.getElementById('details-modal').classList.add('hidden');
     };
+
+    const exportBtn = document.getElementById('export-json');
+    if (exportBtn) {
+        exportBtn.addEventListener('click', () => {
+            if (!currentResults) return;
+            const outputArray = currentResults.map(q => {
+                const out = {
+                    "Attribute": q.Attribute,
+                    "Questions": q.Question,
+                    "Most Representative Statement": q["Most Representative Statement"],
+                    "Score": q.Score,
+                    "Level": q.Level,
+                    "Justification for Level": q["Justification for Level"],
+                    "Justification as to why other statements are not relevant": q["Justification as to why other statements are not relevant"],
+                    "Summary Statement": q["Summary Statement"]
+                };
+                for(let i=1; i<=q['Extract Count']; i++) {
+                    if (q[`Extract Statement ${i}`]) {
+                        out[`Extract Statement ${i}`] = q[`Extract Statement ${i}`];
+                    }
+                }
+                return out;
+            });
+            const blob = new Blob([JSON.stringify(outputArray, null, 2)], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = "MIE_Audit_Report.json";
+            a.click();
+            URL.revokeObjectURL(url);
+        });
+    }
 };
 
 const fetchDimensions = async () => {
@@ -65,35 +97,54 @@ const renderDimensionsSelector = (dims) => {
 
 const startAnalysis = async () => {
     const fileInput = document.getElementById('file-input');
+    const analyzeBtn = document.getElementById('analyze-btn');
     const selectedDims = Array.from(document.querySelectorAll('input[name="dimension"]:checked'))
         .map(i => i.value);
 
     if (!fileInput.files[0]) return;
 
+    analyzeBtn.disabled = true;
+    analyzeBtn.innerHTML = 'Analyzing... <i data-lucide="loader-2" class="animate-spin"></i>';
+    if (window.lucide) lucide.createIcons();
+
     document.getElementById('hero-hub').classList.add('hidden');
     document.getElementById('loading-state').classList.remove('hidden');
+
+    // Re-enabling stylized data stream with Mixed Colors (Black, Green, White)
+    const leftStream = document.getElementById('data-stream-left');
+    const rightStream = document.getElementById('data-stream-right');
+    const progressPct = document.getElementById('progress-pct');
+
+    const streamInterval = setInterval(() => {
+        const hex = () => Math.random().toString(16).substring(2, 6).toUpperCase();
+        const colors = ["#000000", "#00ff88", "#ffffff", "#004422"];
+        const color = colors[Math.floor(Math.random() * colors.length)];
+        const bit = `<span style="color:${color}">${hex()}</span> `;
+        if (leftStream) leftStream.innerHTML = bit + leftStream.innerHTML.substring(0, 800);
+        if (rightStream) rightStream.innerHTML = bit + rightStream.innerHTML.substring(0, 800);
+    }, 80);
 
     const formData = new FormData();
     formData.append('pdf', fileInput.files[0]);
     formData.append('dimensions', selectedDims.join(','));
 
     try {
-        const progressEl = document.getElementById('progress-pct');
         let progress = 0;
         const progressInterval = setInterval(() => {
-            if (progress < 95) progress += Math.random() * 2;
-            if (progressEl) progressEl.innerText = Math.floor(progress) + '%';
-        }, 500);
+            if (progress < 96) progress += 0.4;
+            if (progressPct) progressPct.innerText = Math.floor(progress) + '%';
+        }, 120);
 
         const response = await fetch(`${API_BASE}/analyse`, {
-            method: 'POST',
-            body: formData
+            method: 'POST', body: formData
         });
 
+        if (!response.ok) throw new Error(`Engine Error: ${response.status}`);
         const data = await response.json();
+        
         clearInterval(progressInterval);
-        if (progressEl) progressEl.innerText = '100%';
-
+        clearInterval(streamInterval);
+        
         if (data.success) {
             currentResults = data.results;
             setTimeout(() => {
@@ -102,18 +153,29 @@ const startAnalysis = async () => {
                 renderResultsGrid(data.results, data.meta);
             }, 500);
         } else {
-            throw new Error(data.error || 'Analysis failed');
+            throw new Error(data.error || 'The analysis engine encountered an internal issue.');
         }
     } catch (err) {
-        alert('Error: ' + err.message);
+        clearInterval(streamInterval);
+        console.error('[MIE_UI_ERR]', err);
+        alert('ANALYSIS FAILED:\n' + err.message);
         document.getElementById('loading-state').classList.add('hidden');
         document.getElementById('hero-hub').classList.remove('hidden');
+        analyzeBtn.disabled = false;
+        analyzeBtn.innerHTML = 'Initialize Analysis <i data-lucide="terminal"></i>';
+        if (window.lucide) lucide.createIcons();
     }
 };
 
 const renderResultsGrid = (results, meta) => {
     const grid = document.getElementById('audit-bento-grid');
+    if (!grid) return;
     grid.innerHTML = '';
+
+    if (!results || results.length === 0) {
+        grid.innerHTML = '<div style="grid-column: 1/-1; padding: 40px; text-align: center; color: #888;">No audit signals identified.</div>';
+        return;
+    }
 
     const grouped = {};
     results.forEach(r => {
@@ -123,31 +185,36 @@ const renderResultsGrid = (results, meta) => {
     });
 
     Object.entries(grouped).forEach(([themeName, questions], idx) => {
-        const color = THEME_COLORS[idx % THEME_COLORS.length];
+        const themeColor = THEME_COLORS[idx % THEME_COLORS.length] || '#a0e7a0';
         
         const section = document.createElement('div');
         section.className = 'theme-section';
         section.innerHTML = `
-            <div style="background:${color}11; padding:20px; border-radius:12px; margin-bottom:12px; border:1px solid ${color}33">
-                <h3 style="color:${color}; font-size:18px;">${themeName}</h3>
+            <div class="theme-section-header" style="border-left: 6px solid ${themeColor}; background:#fff; padding:20px 32px; border-radius:16px; margin-bottom:24px; box-shadow:0 10px 30px rgba(0,0,0,0.02); border:1px solid #eee;">
+                <h3 style="color:black; font-size:22px; margin:0;">${themeName}</h3>
             </div>
-            <div class="questions-grid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap:12px; margin-bottom:32px;"></div>
+            <div class="questions-grid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap:24px; margin-bottom:48px;"></div>
         `;
 
         const qGrid = section.querySelector('.questions-grid');
         questions.forEach(q => {
             const card = document.createElement('div');
             card.className = 'result-card';
-            card.style.cssText = `background:white; color:black; padding:20px; border-radius:12px; cursor:pointer; border:1px solid #eee; transition: transform 0.2s;`;
-            card.onmouseover = () => card.style.transform = 'scale(1.02)';
-            card.onmouseout = () => card.style.transform = 'scale(1)';
-            
+            const displayLevel = q.Level && q.Level.includes('(') ? q.Level.split('(')[1].replace(')', '') : (q.Level || 'N/A');
+
             card.innerHTML = `
-                <div style="font-size:11px; color:#888; margin-bottom:8px; font-weight:700;">${q.QuestionID}</div>
-                <div style="font-weight:700; font-size:14px; margin-bottom:12px; height: 40px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">${q.Question}</div>
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-top: auto;">
-                    <span style="background:${q.LevelColor}; color:white; padding:4px 12px; border-radius:20px; font-weight:800; font-size:11px; text-transform: uppercase;">${q.Level.split('(')[1].replace(')', '')}</span>
-                    <span style="font-size:24px; font-weight:900; color:${q.LevelColor}">${q.Score}.0</span>
+                <div style="font-size:10px; color:#aaa; margin-bottom:12px; font-weight:800; text-transform:uppercase; letter-spacing:1px;">${q.QuestionID || 'DIM-ERR'}</div>
+                <div style="font-weight:700; font-size:16px; margin-bottom:24px; line-height:1.4; flex-grow:1; color:black;">${q.Question || 'Unknown Dimension'}</div>
+                
+                <div style="display:flex; justify-content:space-between; align-items:flex-end; border-top: 1px solid #f0f0f0; padding-top:20px;">
+                    <div>
+                        <div style="font-size:10px; color:#aaa; font-weight:800; text-transform:uppercase; margin-bottom:4px;">Maturity Level</div>
+                        <span style="background:${q.LevelColor || '#888'}15; color:${q.LevelColor || '#888'}; padding:4px 12px; border-radius:12px; font-weight:800; font-size:10px; text-transform: uppercase;">${displayLevel}</span>
+                    </div>
+                    <div style="text-align:right;">
+                        <div style="font-size:10px; color:#aaa; font-weight:800; text-transform:uppercase; margin-bottom:2px;">Audit Score</div>
+                        <div style="font-size:32px; font-weight:900; color:black; line-height:1;">${q.Score || 0}.0</div>
+                    </div>
                 </div>
             `;
             card.onclick = () => openDetails(q);
@@ -157,7 +224,7 @@ const renderResultsGrid = (results, meta) => {
         grid.appendChild(section);
     });
 
-    lucide.createIcons();
+    if (window.lucide) lucide.createIcons();
 };
 
 const openDetails = (q) => {
@@ -165,89 +232,101 @@ const openDetails = (q) => {
     const modal = document.getElementById('details-modal');
     const body = document.getElementById('modal-body');
     
-    // UI Style: White background, Black text, Sans-serif font (Inter)
+    if (!modal || !body) return;
+
     body.innerHTML = `
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
-            <h2 style="color:white; margin:0; font-size:22px;">Audit Intelligence: ${q.QuestionID}</h2>
-            <button id="copy-report-btn" style="background: var(--accent-green); color: black; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 700; cursor: pointer; display:flex; align-items:center; gap:8px;">
-                <i data-lucide="copy" style="width:16px;"></i> Copy Report
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:24px; border-bottom:1px solid #eee; padding-bottom:24px; gap:40px;">
+            <div style="flex-grow:1;">
+                <h2 style="color:black; margin:0 0 12px 0; font-size:24px; font-weight:900;">Audit Intelligence: ${q.QuestionID || 'N/A'}</h2>
+                <div style="font-size:18px; font-weight:700; color:#111; line-height:1.4;">${q.Question || 'N/A'}</div>
+            </div>
+            <button id="copy-report-btn" class="primary-pill-btn" style="flex-shrink:0; background: var(--accent-green); color: black; border: none; padding: 14px 28px; border-radius: 16px; font-weight: 700; cursor: pointer; display:flex; align-items:center; gap:8px; box-shadow: 0 4px 12px rgba(52, 168, 83, 0.2);">
+                <i data-lucide="copy" style="width:18px;"></i> Copy Deterministic Report
             </button>
         </div>
 
-        <div style="background:white; color:black; border-radius:16px; padding:32px; font-family:'Inter', sans-serif; box-shadow: 0 20px 40px rgba(0,0,0,0.3); max-height: 70vh; overflow-y: auto;">
+        <div style="background:white; color:black; font-family:'Inter', sans-serif;">
             
-            <div class="report-row" style="margin-bottom:24px;">
-                <label style="display:block; text-transform:uppercase; font-size:11px; font-weight:800; color:#888; margin-bottom:6px; letter-spacing:1px;">Attribute</label>
-                <div style="font-size:18px; font-weight:700;">${q.Attribute}</div>
+            <div style="margin-bottom:32px; padding:20px; background:#fcfcfc; border-radius:20px; border:1px solid #f0f0f0;">
+                <label style="display:block; text-transform:uppercase; font-size:10px; font-weight:800; color:#888; margin-bottom:8px; letter-spacing:1px;">Strategic Pillar / Attribute</label>
+                <div style="font-size:15px; font-weight:700; color:black;">${q.Attribute || 'N/A'}</div>
             </div>
 
-            <div class="report-row" style="margin-bottom:24px;">
-                <label style="display:block; text-transform:uppercase; font-size:11px; font-weight:800; color:#888; margin-bottom:6px; letter-spacing:1px;">Questions</label>
-                <div style="font-size:18px; font-weight:700;">${q.Question}</div>
+            <div style="margin-bottom:32px;">
+                <label style="display:block; text-transform:uppercase; font-size:10px; font-weight:800; color:#888; margin-bottom:12px; letter-spacing:1px;">Representative Audit Statement</label>
+                <div style="font-style:italic; line-height:1.8; color:#111; font-size:16px; background:#f7faf8; padding:28px; border-radius:24px; border-left:8px solid var(--accent-green); box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);">"${q["Most Representative Statement"] || 'No direct statement identified.'}"</div>
             </div>
 
-            <div class="report-row" style="margin-bottom:24px;">
-                <label style="display:block; text-transform:uppercase; font-size:11px; font-weight:800; color:#888; margin-bottom:6px; letter-spacing:1px;">Most Representative Statement</label>
-                <div style="font-style:italic; line-height:1.6; color:#333;">${q["Most Representative Statement"]}</div>
-            </div>
-
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px; margin-bottom:24px; padding-bottom:24px; border-bottom: 1px solid #eee;">
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:24px; margin-bottom:32px; padding:24px; background:#f9f9f9; border-radius:32px;">
                 <div>
-                    <label style="display:block; text-transform:uppercase; font-size:11px; font-weight:800; color:#888; margin-bottom:6px; letter-spacing:1px;">Score</label>
-                    <div style="font-size:32px; font-weight:900; color:${q.LevelColor}">${q.Score}.0</div>
+                    <label style="display:block; text-transform:uppercase; font-size:10px; font-weight:800; color:#888; margin-bottom:6px; letter-spacing:1px;">Audit Score</label>
+                    <div style="font-size:48px; font-weight:900; color:black;">${q.Score || 0}.0</div>
                 </div>
                 <div>
-                    <label style="display:block; text-transform:uppercase; font-size:11px; font-weight:800; color:#888; margin-bottom:6px; letter-spacing:1px;">Level</label>
-                    <div style="font-size:18px; font-weight:700;">${q.Level}</div>
+                    <label style="display:block; text-transform:uppercase; font-size:10px; font-weight:800; color:#888; margin-bottom:6px; letter-spacing:1px;">Maturity Level</label>
+                    <div style="font-size:18px; font-weight:700; color:black; margin-top:14px;">${q.Level || 'N/A'}</div>
                 </div>
             </div>
 
-            <div class="report-row" style="margin-bottom:24px;">
-                <label style="display:block; text-transform:uppercase; font-size:11px; font-weight:800; color:#888; margin-bottom:12px; letter-spacing:1px;">Justification for Level</label>
-                <div style="line-height:1.7; color:#444; white-space:pre-wrap;">${q["Justification for Level"]}</div>
+            <div style="margin-bottom:32px;">
+                <label style="display:block; text-transform:uppercase; font-size:10px; font-weight:800; color:#888; margin-bottom:12px; letter-spacing:1px;">Justification for Level</label>
+                <div style="line-height:1.8; color:black; font-size:14px; white-space:pre-wrap;">${q["Justification for Level"] || 'Detailed justification unavailable.'}</div>
             </div>
 
-            <div class="report-row" style="margin-bottom:24px;">
-                <label style="display:block; text-transform:uppercase; font-size:11px; font-weight:800; color:#888; margin-bottom:12px; letter-spacing:1px;">Justification as to why other statements are not relevant</label>
-                <div style="line-height:1.7; color:#444; white-space:pre-wrap;">${q["Justification as to why other statements are not relevant"]}</div>
+            <div style="margin-bottom:32px;">
+                <label style="display:block; text-transform:uppercase; font-size:10px; font-weight:800; color:#888; margin-bottom:12px; letter-spacing:1px;">Rationale for Rejected Levels</label>
+                <div style="line-height:1.8; color:black; font-size:14px; white-space:pre-wrap;">${q["Justification as to why other statements are not relevant"] || 'Rejection rationale unavailable.'}</div>
             </div>
 
-            <div class="report-row" style="background:#f8f9fa; padding:24px; border-radius:12px; border:1px solid #eee; margin-bottom:24px;">
-                <label style="display:block; text-transform:uppercase; font-size:11px; font-weight:800; color:#888; margin-bottom:12px; letter-spacing:1px;">Summary Statement</label>
-                <div style="line-height:1.8; color:#222; font-size:15px; white-space:pre-wrap;">${q["Summary Statement"]}</div>
+            <div style="margin-bottom:40px; padding-top:32px; border-top:1px solid #eee;">
+                <label style="display:block; text-transform:uppercase; font-size:10px; font-weight:800; color:#888; margin-bottom:12px; letter-spacing:1px;">Comprehensive Summary</label>
+                <div style="line-height:1.9; color:black; font-size:15px; white-space:pre-wrap;">${q["Summary Statement"] || 'Summary analysis unavailable.'}</div>
             </div>
 
             <div class="extracts-section">
-                <label style="display:block; text-transform:uppercase; font-size:11px; font-weight:800; color:#888; margin-bottom:16px; letter-spacing:1px;">Extract Statements (Audit Evidence)</label>
+                <label style="display:block; text-transform:uppercase; font-size:10px; font-weight:800; color:#888; margin-bottom:20px; letter-spacing:1px;">Verbatim Evidence Fragments (Page-Ordered Audit Trail)</label>
                 <div id="extract-list-container"></div>
             </div>
         </div>
     `;
 
-    // Render extracts (Exactly 1-6)
     const extractContainer = body.querySelector('#extract-list-container');
     let extractHtml = '';
-    for(let i=1; i<=6; i++) {
+    for(let i=1; i<=100; i++) {
         if(q[`Extract Statement ${i}`]) {
             extractHtml += `
-                <div style="margin-bottom:16px; padding:16px; border-left:4px solid ${q.LevelColor}; background:#fafafa; border-radius:0 8px 8px 0;">
-                    <div style="font-size:10px; font-weight:800; color:#aaa; text-transform:uppercase; margin-bottom:4px;">Extract ${i} (Page ${q[`Extract Page ${i}`]})</div>
-                    <div style="font-size:13px; color:#333; line-height:1.6; font-style:italic;">"${q[`Extract Statement ${i}`]}"</div>
+                <div style="margin-bottom:20px; padding:20px; border-left:6px solid var(--accent-green); background:#fdfdfd; border-radius:0 16px 16px 0; border: 1px solid #f0f0f0; border-left-width: 6px;">
+                    <div style="font-size:10px; font-weight:800; color:#aaa; text-transform:uppercase; margin-bottom:8px;">Evidence Fragment ${i} (Page ${q[`Extract Page ${i}`] || '?'})</div>
+                    <div style="font-size:14px; color:black; line-height:1.7; font-style:italic;">"${q[`Extract Statement ${i}`]}"</div>
                 </div>
             `;
         }
     }
-    extractContainer.innerHTML = extractHtml || '<div style="color:#aaa; font-style:italic;">No extracts identified.</div>';
+    extractContainer.innerHTML = extractHtml || '<div style="color:#aaa; font-style:italic;">No discrete verbatim evidence identified.</div>';
 
-    document.getElementById('copy-report-btn').onclick = () => copyToClipboard(currentActiveQuestion.exactFormat);
+    document.getElementById('copy-report-btn').onclick = () => {
+        const textToCopy = q.exactFormat || `Score: ${q.Score}\nLevel: ${q.Level}`;
+        copyToClipboard(textToCopy);
+    };
 
     modal.classList.remove('hidden');
-    lucide.createIcons();
+    if (window.lucide) lucide.createIcons();
 };
 
 const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text).then(() => {
-        alert('Audit report copied to clipboard!');
+        const btn = document.getElementById('copy-report-btn');
+        const originalContent = btn.innerHTML;
+        btn.innerHTML = '<i data-lucide="check" style="width:16px;"></i> Result Copied';
+        btn.style.background = '#e8f5e9';
+        btn.style.color = '#2e7d32';
+        if (window.lucide) lucide.createIcons();
+        setTimeout(() => {
+            btn.innerHTML = originalContent;
+            btn.style.background = 'var(--accent-green)';
+            btn.style.color = 'black';
+            if (window.lucide) lucide.createIcons();
+        }, 2000);
     });
 };
 

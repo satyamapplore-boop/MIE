@@ -16,7 +16,7 @@
         <header class="app-header">
             <div class="logo-section">
                 <div class="logo-icon-box"><i data-lucide="shield-check"></i></div>
-                <h1>MIE <span style="font-size:14px; opacity:0.3; font-weight:400; margin-left:8px;">| Enterprise Analysis v2.0</span></h1>
+                <h1>MIE</h1>
             </div>
             <div class="header-controls">
                 <span class="dim-pill" style="background:#1a1c1b; color:#0e8; border:1px solid #064;"><i data-lucide="zap" style="width:14px;height:14px;margin-right:6px;"></i>High-Fidelity Mode</span>
@@ -56,18 +56,30 @@
                 </div>
             </article>
 
-            <!-- Loading State -->
-            <section id="loading-state" class="hidden" style="text-align: center; padding: 100px 0;">
-                <div class="loader-container">
-                    <div class="loader-ring"></div>
-                    <div class="loader-scanner"></div>
-                    <div class="loader-binary">
-                        <span id="progress-pct" style="display:block; font-size: 32px; font-weight: 900; line-height: 1;">0%</span>
-                        <span style="font-size: 10px; text-transform: uppercase; letter-spacing: 2px; opacity: 0.6; margin-top: 4px;">Analyzing</span>
+            <!-- High-Fidelity Deterministic Loading State -->
+            <section id="loading-state" class="hidden">
+                <div class="deterministic-loader">
+                    <div class="hud-center">
+                        <div class="hud-ring ring-1"></div>
+                        <div class="hud-ring ring-2"></div>
+                        <div class="hud-ring ring-3"></div>
+                        <div class="hud-scanner"></div>
+                        <div class="hud-core">
+                             <span id="progress-pct">0%</span>
+                        </div>
                     </div>
+                    
+                    <div class="data-stream-container">
+                        <div class="data-stream" id="data-stream-left"></div>
+                        <div class="data-stream" id="data-stream-right"></div>
+                    </div>
+
+                    <!-- Decorative HUD corners -->
+                    <div class="hud-corner top-left"></div>
+                    <div class="hud-corner top-right"></div>
+                    <div class="hud-corner bottom-left"></div>
+                    <div class="hud-corner bottom-right"></div>
                 </div>
-                <h2 id="loading-message" style="font-size:32px; color: var(--accent-green); margin-bottom: 8px;">Deterministic Engine Sequencing...</h2>
-                <p id="loading-sub" style="opacity:0.4; font-size:14px;">Analyzing PDF structure & verbatim extraction</p>
             </section>
 
 
@@ -79,8 +91,8 @@
                         <span class="results-meta" style="opacity: 0.4; font-size: 12px; font-weight: 500; letter-spacing: 0.5px;">AUDIT-READY VERBATIM OUTPUT</span>
                     </div>
                     <div style="display: flex; gap: 12px;">
-                        <button id="reset-btn" class="primary-pill-btn" style="background: transparent; color: white; border: 1px solid #333; padding: 12px 24px; font-size:14px;" onclick="window.location.reload()">Start New</button>
-                        <button id="export-json" class="primary-pill-btn" style="padding: 12px 24px; font-size:14px; background: white; color: #000;">Export Report JSON</button>
+                        <button id="reset-btn" class="primary-pill-btn" style="background: #f0f0f0; color: black; border: 1px solid #ddd; padding: 12px 24px; font-size:14px;" onclick="window.location.reload()">Start New Audit</button>
+                        <button id="export-json" class="primary-pill-btn" style="padding: 12px 24px; font-size:14px; background: var(--accent-green); color: black;">Export Report JSON</button>
                     </div>
                 </div>
                 
@@ -93,8 +105,8 @@
 
     <!-- Details Modal -->
     <div id="details-modal" class="modal hidden">
-        <div class="modal-content" style="background: #000; border: 1px solid rgba(255,255,255,0.1); border-radius: 24px; color: white; padding: 40px; max-width: 900px;">
-            <button id="close-modal" class="close-btn" style="top: 24px; right: 24px; color: white;"><i data-lucide="x"></i></button>
+        <div class="modal-content">
+            <button id="close-modal" class="close-btn"><i data-lucide="x"></i></button>
             <div id="modal-body">
                 <!-- Inner populated by JS -->
             </div>
