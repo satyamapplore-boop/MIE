@@ -9,43 +9,39 @@ const { DIMENSIONS } = require('./dimensions');
 
 const runFullAnalysis = (pages, dimIds) => {
     const results = [];
+    console.log(`[MIE_ENGINE] Starting analysis for ${pages.length} pages...`);
 
     // Filter themes by selected dimension IDs; default to all
     const targetDimensions = dimIds && dimIds.length > 0
         ? DIMENSIONS.filter(d => dimIds.includes(d.id.toString()) || dimIds.includes(d.id))
         : DIMENSIONS;
 
+    console.log(`[MIE_ENGINE] Target themes: ${targetDimensions.length}`);
+
     targetDimensions.forEach(theme => {
-        // theme.questions is the array of question objects
         if (!theme.questions || !Array.isArray(theme.questions)) return;
 
+        console.log(`[MIE_ENGINE] Analyzing Theme: ${theme.theme}`);
+
         theme.questions.forEach(q => {
-            // Merge theme-level triggers with question-level triggers (questions may not have keywords)
             const combinedTriggers = [
                 ...(q.triggers || []),
                 ...(theme.triggers || [])
             ];
-            // Deduplicate
             const uniqueTriggers = [...new Set(combinedTriggers)];
 
             const dimensionForExtractor = {
                 title: q.title,
-                keywords: uniqueTriggers,   // extractor reads .keywords
-                triggers: uniqueTriggers    // extractor also reads .triggers for boost
+                keywords: uniqueTriggers,
+                triggers: uniqueTriggers
             };
 
             const extracts = extractVerbatimStatements(pages, dimensionForExtractor);
-
-            // Pass raw theme and question so scorer/justifier can access triggers / rubric
-            const scoreData = scoreExtracts(extracts, {
-                triggers: uniqueTriggers
-            }, q);
-
+            const scoreData = scoreExtracts(extracts, { triggers: uniqueTriggers }, q);
             const justification = buildJustification(q, extracts, scoreData);
             const summary = buildSummary(q, extracts, scoreData);
             const mostRep = selectMostRepresentativeStatement(extracts);
 
-            // Build exact text format string
             let exactFormat = `**Attribute:**\n${theme.theme}\n\n`;
             exactFormat += `**Question:**\n${q.title}\n\n`;
             exactFormat += `**Most Representative Statement:**\n${mostRep}\n\n`;
@@ -77,7 +73,6 @@ const runFullAnalysis = (pages, dimIds) => {
                 'exactFormat': exactFormat.trim()
             };
 
-            // Add dynamic extract fields
             extracts.forEach((e, idx) => {
                 result[`Extract Statement ${idx + 1}`] = e.text;
                 result[`Extract Page ${idx + 1}`] = e.page;
@@ -87,6 +82,7 @@ const runFullAnalysis = (pages, dimIds) => {
         });
     });
 
+    console.log(`\n[MIE_ENGINE] Analysis complete. Generated ${results.length} reports.`);
     return results;
 };
 
