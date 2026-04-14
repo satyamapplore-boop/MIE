@@ -253,7 +253,7 @@ const openDetails = (q) => {
             </div>
 
             <div style="margin-bottom:32px;">
-                <label style="display:block; text-transform:uppercase; font-size:10px; font-weight:800; color:#888; margin-bottom:12px; letter-spacing:1px;">Representative Audit Statement</label>
+                <label style="display:block; text-transform:uppercase; font-size:10px; font-weight:800; color:#888; margin-bottom:12px; letter-spacing:1px;">Most Representative Statement</label>
                 <div style="font-style:italic; line-height:1.8; color:#111; font-size:16px; background:#f7faf8; padding:28px; border-radius:24px; border-left:8px solid var(--accent-green); box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);">"${q["Most Representative Statement"] || 'No direct statement identified.'}"</div>
             </div>
 
@@ -274,7 +274,7 @@ const openDetails = (q) => {
             </div>
 
             <div style="margin-bottom:32px;">
-                <label style="display:block; text-transform:uppercase; font-size:10px; font-weight:800; color:#888; margin-bottom:12px; letter-spacing:1px;">Rationale for Rejected Levels</label>
+                <label style="display:block; text-transform:uppercase; font-size:10px; font-weight:800; color:#888; margin-bottom:12px; letter-spacing:1px;">Justification as to why other statements are not relevant</label>
                 <div style="line-height:1.8; color:black; font-size:14px; white-space:pre-wrap;">${q["Justification as to why other statements are not relevant"] || 'Rejection rationale unavailable.'}</div>
             </div>
 
