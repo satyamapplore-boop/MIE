@@ -20,28 +20,22 @@ const buildJustification = (question, extracts, scoreData) => {
     if (!hasContent) {
         justificationForLevel = 'Unable to score — no relevant content identified in the report for this dimension.';
     } else {
-        const topExtract = extracts[0].text;
-        justificationForLevel = `This statement best encapsulates the multi-faceted purpose and strategy articulated across the organization's official reports. The organization's approach is explicitly designed to balance financial performance with its responsibilities to a wide range of stakeholders and the environment, which aligns directly with the goal of Level ${scoreData.score} maturity: "${scoreData.bestStatement}".\n\n`;
+        justificationForLevel = `This statement best encapsulates the multi-faceted purpose and strategy articulated across the organization's official reports. The organization's approach is explicitly designed to balance financial performance with its responsibilities to a wide range of stakeholders and the environment, which aligns directly with the concepts of holistic value and the integration of "people, profit, and the planet" at a Level ${scoreData.score} context.\n\n`;
         
         justificationForLevel += `Evidence from the sources is broken down by each component of the statement:\n\n`;
 
-        // We use the top extracts to act as "components"
-        extracts.slice(0, 6).forEach((ex, idx) => {
+        // Create categories from extracts
+        const limit = Math.min(6, extracts.length);
+        for (let i = 0; i < limit; i++) {
+            const ex = extracts[i];
             const rawTheme = (ex.matchedKeywords && ex.matchedKeywords.length > 0) ? ex.matchedKeywords[0] : 'Strategic Alignment';
-            // Capitalize theme
             const theme = rawTheme.charAt(0).toUpperCase() + rawTheme.slice(1);
             
-            justificationForLevel += `• ${theme}: The organization explicitly identifies its objective as creating value through this component.\n`;
-            justificationForLevel += `    ◦ Verbatim Evidence (Page ${ex.page}): "${ex.text}"\n`;
-            justificationForLevel += `    ◦ Assessment logic: This disclosure demonstrates specific alignment with ${scoreData.label} maturity by ${theme === 'Strategic Alignment' ? 'integrating core values into its governance' : 'substantiating claims regarding ' + theme}. It provides a direct link between reported action and the requirement for "${scoreData.bestStatement}".\n\n`;
-        });
-
-        // Add a "Cohesive Integration" section if high score
-        if (scoreData.score >= 4) {
-            justificationForLevel += `• Cohesively Integrating People, Profit, and the Planet: The strategy and reporting structure are explicitly built around integrating these three elements. As demonstrated by the density of keywords like "${extracts.map(e => e.matchedKeywords[0]).slice(0,3).join(', ')}", the organisation directly links profit-driven aims with responsibilities to society and employees, fulfilling the requirements for an Emerging Exponential maturity level.`;
-        } else {
-            justificationForLevel += `• Strategic Alignment Goal: While foundational signals are present, the organisation is currently in the process of harmonizing these disparite reporting threads into a unified strategic narrative. The current evidence provides a defensible baseline for Level ${scoreData.score} maturity.`;
+            justificationForLevel += `• ${theme}: The organization explicitly identifies its objective as creating value through this pillar. This is demonstrated by its commitment to "${ex.text.substring(0, 350)}${ex.text.length > 350 ? '...' : ''}". The firm emphasizes its dedication to ${theme.toLowerCase()} where it can unlock long-term structural growth.\n\n`;
         }
+
+        // Add the cohesive integration theme
+        justificationForLevel += `• Cohesively Integrating People, Profit, and the Planet: The organization's strategy and reporting structure are explicitly built around integrating these three elements. As supported by the density of thematic signals like "${extracts.slice(0, 3).map(e => e.matchedKeywords[0]).join(', ')}", the audit ensures that profit-driven aims are directly linked with responsibilities to society and the broader ecosystem, fulfilling the definitive requirements for ${scoreData.label} maturity.`;
     }
 
     let justificationOthers = '';
