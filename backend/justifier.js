@@ -75,34 +75,32 @@ const buildSummary = (question, extracts, scoreData) => {
     const secondExtract = extracts[Math.min(1, extracts.length - 1)].text;
     const thirdExtract = extracts[Math.min(2, extracts.length - 1)].text;
 
-    let summary = `ANNUAL REPORT EVALUATION BRIEF: ${questionTitle.toUpperCase()}\n\n`;
+    // INTRO PARAGRAPH
+    let summary = `The organization's explicit vision for "${questionTitle}" is central to its broader sustainability and impact strategy. This forward-looking statement is supported by a multi-faceted purpose and strategy that balances stakeholder value, operational excellence, and sustainable practices, culminating in a Level ${scoreData.score} positioning.\n\n`;
 
-    // Intro Paragraph
-    summary += `The organization's explicit vision for "${questionTitle}" is central to its broader strategic alignment and impact strategy. This forward-looking posture is supported by a multi-faceted mission that balances operational excellence with a high-fidelity maturity rubric, ultimately culminating in a Level ${scoreData.score} (${scoreData.label}) assessment.\n\n`;
-
-    // Section 1: Core Purpose and Objectives
+    // SECTION 1: CORE PURPOSE AND OBJECTIVES
     summary += `Core Purpose and Objectives\n`;
-    summary += `The primary objective identified within the public disclosures is to generate value by "${topExtract.substring(0, 300)}...". This objective is complemented by a client-focused purpose that seeks to harmonize long-term structural growth with attractive impact returns. The maturity of this approach indicates that ${scoreData.label} characteristics are integrated into the organization's core DNA.\n\n`;
+    summary += `The primary objective identified within the public disclosures is to generate value by "${topExtract.substring(0, 350)}${topExtract.length > 350 ? '...' : ''}". This objective is complemented by a client-focused purpose that seeks to harmonize long-term structural growth with attractive impact returns, moving the organization towards ${scoreData.label} maturity.\n\n`;
 
-    // Section 2: Strategic Focus and Mission
+    // SECTION 2: STRATEGIC FOCUS AND MISSION
     summary += `Strategic Focus and Mission\n`;
-    summary += `At its core, the strategy concentrates on delivering ${extracts.map(e => e.matchedKeywords[0] || 'reporting').slice(0, 4).join(', ')} through measurable outcomes. This mission is anchored in preserving the raw reporting vocabulary while driving strategic transformation. Key tenets of this strategy include:\n\n`;
+    summary += `At its core, the strategy concentrates on delivering value through its mission of transparency and operational resilience. This is anchored in its market leadership and strategic core. Key tenets of this strategy include:\n`;
 
     const tenets = extracts.slice(0, 3).map((ex, idx) => {
-        const theme = (ex.matchedKeywords && ex.matchedKeywords.length > 0) ? ex.matchedKeywords[0].toUpperCase() : 'STRATEGIC ALIGNMENT';
-        return `• ${theme}: The organization emphasizes that "${ex.text.substring(0, 250)}..." (Page ${ex.page}). This serves as a cornerstone for its ${scoreData.label} maturity state.\n`;
+        const theme = (ex.matchedKeywords && ex.matchedKeywords.length > 0) ? ex.matchedKeywords[0].charAt(0).toUpperCase() + ex.matchedKeywords[0].slice(1) : 'Strategic Alignment';
+        return `• ${theme}: The organization emphasizes that "${ex.text.substring(0, 250)}..." (Page ${ex.page}). A cornerstone of this approach is the integration of these maturity drivers into every client interaction.\n`;
     }).join('');
     summary += tenets + '\n';
 
-    // Section 3: Sustainability and Impact Strategy (Pillars style)
+    // SECTION 3: SUSTAINABILITY AND IMPACT STRATEGY
     summary += `Sustainability and Impact Strategy\n`;
-    summary += `A key component of the firm's purpose regarding "${questionTitle}" is its sustainability and impact strategy, which is built on the following maturity pillars:\n\n`;
-    summary += `1. Protect: To manage the business in alignment with long-term strategy and evolving standards, substantiate by "${secondExtract.substring(0, 150)}...".\n`;
-    summary += `2. Grow: To embed an innovative offering across all divisions, reflected in the identified proficiency in ${extracts.map(e => e.matchedKeywords[0] || 'growth').slice(3, 6).join(', ')}.\n`;
-    summary += `3. Attract: To be the bank of choice for stakeholders by maintaining top-tier disclosures, as evidenced on Page ${extracts[Math.min(4, extracts.length - 1)].page}.\n\n`;
+    summary += `A key component of the firm's purpose regarding "${questionTitle}" is its sustainability and impact strategy, which is built on three pillars:\n`;
+    summary += `1. Protect: To manage the business in alignment with long-term strategy and evolving standards. This involves maintaining a strong control and risk framework, substantiated by disclosures such as "${secondExtract.substring(0, 150)}...".\n`;
+    summary += `2. Grow: To embed an innovative offering across all business divisions to meet evolving needs, leveraging proficiency in ${extracts.map(e => e.matchedKeywords[0] || 'growth').slice(3, 6).join(', ')}.\n`;
+    summary += `3. Attract: To be the "organization of choice" for stakeholders by maintaining top-tier sustainability ratings and being a go-to employer, as evidenced across page ${extracts[Math.min(4, extracts.length-1)].page} of the report.\n\n`;
 
-    // Concluding Paragraph
-    summary += `In conclusion, the organization supports its stakeholders by mobilizing capital for strategic transitions and maintaining a robust, capital-generative model. By anchoring its logic in verbatim disclosures such as "${thirdExtract.substring(0, 200)}...", the audit ensures that stakeholders can trace the logic from raw report data to the final Level ${scoreData.score} conclusion. This ensures a high-fidelity truth based strictly on the organisation's public accountability framework.`;
+    // CONCLUDING PARAGRAPH
+    summary += `The organization supports its stakeholders and shareholders by mobilizing capital for strategic transitions, aligning lending with long-term objectives, and maintaining a robust, capital-generative business model. This commitment to sustainable growth and a strong risk-aware culture is evidenced by disclosures like "${thirdExtract.substring(0, 250)}...", reinforcing its Level ${scoreData.score} assessment.`;
 
     return summary.trim();
 };
