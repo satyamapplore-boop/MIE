@@ -296,7 +296,7 @@ const openDetails = (q) => {
         if(q[`Extract Statement ${i}`]) {
             extractHtml += `
                 <div style="margin-bottom:20px; padding:20px; border-left:6px solid var(--accent-green); background:#fdfdfd; border-radius:0 16px 16px 0; border: 1px solid #f0f0f0; border-left-width: 6px;">
-                    <div style="font-size:10px; font-weight:800; color:#aaa; text-transform:uppercase; margin-bottom:8px;">Evidence Fragment ${i} (Page ${q[`Extract Page ${i}`] || '?'})</div>
+                    <div style="font-size:10px; font-weight:800; color:#aaa; text-transform:uppercase; margin-bottom:8px;">Extract Statement ${i} (Page ${q[`Extract Page ${i}`] || '?'})</div>
                     <div style="font-size:14px; color:black; line-height:1.7; font-style:italic;">"${q[`Extract Statement ${i}`]}"</div>
                 </div>
             `;
