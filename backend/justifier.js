@@ -24,15 +24,26 @@ const buildJustification = (question, extracts, scoreData) => {
         
         justificationForLevel += `Evidence from the sources is broken down by each component of the statement:\n\n`;
 
-        // Create categories from extracts
-        const limit = Math.min(6, extracts.length);
-        for (let i = 0; i < limit; i++) {
-            const ex = extracts[i];
+        // Grouping extracts by theme to avoid duplication
+        const grouped = {};
+        extracts.slice(0, 10).forEach(ex => {
             const rawTheme = (ex.matchedKeywords && ex.matchedKeywords.length > 0) ? ex.matchedKeywords[0] : 'Strategic Alignment';
             const theme = rawTheme.charAt(0).toUpperCase() + rawTheme.slice(1);
+            if (!grouped[theme]) grouped[theme] = [];
             
-            justificationForLevel += `• ${theme}: The organization explicitly identifies its objective as creating value through this pillar. This is demonstrated by its commitment to "${ex.text.substring(0, 350)}${ex.text.length > 350 ? '...' : ''}". The firm emphasizes its dedication to ${theme.toLowerCase()} where it can unlock long-term structural growth.\n\n`;
-        }
+            // Avoid text duplication
+            const text = ex.text.substring(0, 350) + (ex.text.length > 350 ? '...' : '');
+            if (!grouped[theme].includes(text)) grouped[theme].push(text);
+        });
+
+        // Render groups
+        Object.keys(grouped).forEach(theme => {
+            justificationForLevel += `• ${theme}: The organization explicitly identifies its objective as creating value through this pillar.\n`;
+            grouped[theme].forEach(text => {
+                justificationForLevel += `    ◦ "${text}"\n`;
+            });
+            justificationForLevel += `\n`;
+        });
 
         // Add the cohesive integration theme
         justificationForLevel += `• Cohesively Integrating People, Profit, and the Planet: The organization's strategy and reporting structure are explicitly built around integrating these three elements. As supported by the density of thematic signals like "${extracts.slice(0, 3).map(e => e.matchedKeywords[0]).join(', ')}", the audit ensures that profit-driven aims are directly linked with responsibilities to society and the broader ecosystem, fulfilling the definitive requirements for ${scoreData.label} maturity.`;
