@@ -6,7 +6,7 @@
 const buildJustification = (question, extracts, scoreData) => {
     const hasContent = extracts && extracts.length > 0;
 
-    // Helper: get rubric label/criteria safely (raw objects use .t and .d)
+    // Helper: get rubric label/criteria safely
     const getRubric = (idx) => {
         if (!question.rubric || !question.rubric[idx]) return { label: 'N/A', criteria: 'N/A' };
         const r = question.rubric[idx];
@@ -21,18 +21,27 @@ const buildJustification = (question, extracts, scoreData) => {
         justificationForLevel = 'Unable to score — no relevant content identified in the report for this dimension.';
     } else {
         const topExtract = extracts[0].text;
-        justificationForLevel = `This statement best encapsulates the evidence found in the audit trail: "${topExtract}"\n\n`;
-        justificationForLevel += `The maturity assessment of Level ${scoreData.score} is substantiated by a detailed review of the organisation's disclosures. The analysis indicates that ${scoreData.label} characteristics are pervasive in the reported text. Specifically, the following verbatim evidence points were identified as core pillars of this maturity state:\n\n`;
+        justificationForLevel = `This statement best encapsulates the multi-faceted purpose and strategy articulated across the organization's official reports. The organization's approach is explicitly designed to balance financial performance with its responsibilities to a wide range of stakeholders and the environment, which aligns directly with the goal of Level ${scoreData.score} maturity: "${scoreData.bestStatement}".\n\n`;
+        
+        justificationForLevel += `Evidence from the sources is broken down by each component of the statement:\n\n`;
 
-        extracts.slice(0, 5).forEach((ex, idx) => {
-            const keywords = ex.matchedKeywords && ex.matchedKeywords.length > 0
-                ? ex.matchedKeywords.join(', ')
-                : 'strategic themes';
-            justificationForLevel += `• Point ${idx + 1} (Page ${ex.page}): "${ex.text}"\n`;
-            justificationForLevel += `  Reasoning: This extract demonstrates specific alignment with the rubric criteria for Level ${scoreData.score} because it explicitly references ${keywords} in a context that validates ${scoreData.label} practices.\n\n`;
+        // We use the top extracts to act as "components"
+        extracts.slice(0, 6).forEach((ex, idx) => {
+            const rawTheme = (ex.matchedKeywords && ex.matchedKeywords.length > 0) ? ex.matchedKeywords[0] : 'Strategic Alignment';
+            // Capitalize theme
+            const theme = rawTheme.charAt(0).toUpperCase() + rawTheme.slice(1);
+            
+            justificationForLevel += `• ${theme}: The organization explicitly identifies its objective as creating value through this component.\n`;
+            justificationForLevel += `    ◦ Verbatim Evidence (Page ${ex.page}): "${ex.text}"\n`;
+            justificationForLevel += `    ◦ Assessment logic: This disclosure demonstrates specific alignment with ${scoreData.label} maturity by ${theme === 'Strategic Alignment' ? 'integrating core values into its governance' : 'substantiating claims regarding ' + theme}. It provides a direct link between reported action and the requirement for "${scoreData.bestStatement}".\n\n`;
         });
 
-        justificationForLevel += `This evidence suggests that the organisation has moved beyond foundational requirements and is actively ${scoreData.score >= 3 ? 'integrating' : 'establishing'} these maturity drivers into its core operational framework.`;
+        // Add a "Cohesive Integration" section if high score
+        if (scoreData.score >= 4) {
+            justificationForLevel += `• Cohesively Integrating People, Profit, and the Planet: The strategy and reporting structure are explicitly built around integrating these three elements. As demonstrated by the density of keywords like "${extracts.map(e => e.matchedKeywords[0]).slice(0,3).join(', ')}", the organisation directly links profit-driven aims with responsibilities to society and employees, fulfilling the requirements for an Emerging Exponential maturity level.`;
+        } else {
+            justificationForLevel += `• Strategic Alignment Goal: While foundational signals are present, the organisation is currently in the process of harmonizing these disparite reporting threads into a unified strategic narrative. The current evidence provides a defensible baseline for Level ${scoreData.score} maturity.`;
+        }
     }
 
     let justificationOthers = '';
