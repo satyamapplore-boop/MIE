@@ -2,7 +2,9 @@
  * MIE Enterprise Analysis Engine — Frontend Orchestrator v2.5
  */
 
-const API_BASE = 'http://localhost:4242/api';
+const API_BASE = window.location.origin.includes('localhost') 
+    ? 'http://localhost:4242/api' 
+    : '/api';
 let currentResults = null;
 let currentActiveQuestion = null;
 
@@ -70,7 +72,7 @@ const init = async () => {
 
 const fetchDimensions = async () => {
     try {
-        const res = await fetch(`${API_BASE}/dimensions`);
+        const res = await fetch(`${API_BASE}/dimensions?v=${Date.now()}`);
         const data = await res.json();
         if (data.success) {
             renderDimensionsSelector(data.dimensions);

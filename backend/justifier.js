@@ -1,113 +1,231 @@
 /**
- * MIE Justification Engine v8.1 (Bug-Fixed)
- * Rubric fields: .l (level), .t (label/title), .d (description/criteria)
+ * MIE Justifier v2.1 — cleaner prose generation
+ *
+ * Exports match engine.js's call signatures:
+ *   buildJustification(question, extracts, scoreData)   → {main, others}
+ *   buildSummary(question, extracts, scoreData)         → string
+ * Internal helpers (buildMainJustification, buildOtherLevelsJustification,
+ * buildSummaryCore, distinctivePhrases) are also exported for direct use.
  */
 
-const buildJustification = (question, extracts, scoreData) => {
-    const hasContent = extracts && extracts.length > 0;
+const DISTINCTIVE_STOPWORDS = new Set([
+    'the','is','a','an','and','or','but','of','to','in','on','at','for','with',
+    'by','from','as','it','its','this','that','these','those','be','been','being',
+    'are','was','were','has','have','had','do','does','did','will','would','should',
+    'could','may','might','our','we','us','they','their','them','which','who','whom',
+    'well','bring','beyond','aims','within','across','both','also','different','various',
+    'several','certain','specific','particular','achieving','delivering','serving',
+    'doing','including','notably','particularly','especially','etc','eg','ie',
+    'organization','organizations','organizational',
+    'level','linear','exponential','partially','emerging','completely',
+    'based','make','makes','very','only','not','no','yes',
+]);
 
-    // Helper: get rubric label/criteria safely
-    const getRubric = (idx) => {
-        if (!question.rubric || !question.rubric[idx]) return { label: 'N/A', criteria: 'N/A' };
-        const r = question.rubric[idx];
-        return {
-            label: r.t || r.label || 'N/A',
-            criteria: r.d || r.criteria || 'N/A'
-        };
-    };
+function tokenize(text) {
+    return (text.toLowerCase().match(/[a-z][a-z\-]+/g) || [])
+        .filter(t => t.length > 3 && !DISTINCTIVE_STOPWORDS.has(t));
+}
 
-    let justificationForLevel = '';
-    if (!hasContent) {
-        justificationForLevel = 'Unable to score — no relevant content identified in the report for this dimension.';
-    } else {
-        justificationForLevel = `This statement best encapsulates the multi-faceted purpose and strategy articulated across the organization's official reports. The organization's approach is explicitly designed to balance financial performance with its responsibilities to a wide range of stakeholders and the environment, which aligns directly with the concepts of holistic value and the integration of "people, profit, and the planet" at a Level ${scoreData.score} context.\n\n`;
-        
-        justificationForLevel += `Evidence from the sources is broken down by each component of the statement:\n\n`;
+function trigrams(tokens) {
+    const out = [];
+    for (let i = 0; i < tokens.length - 2; i++) {
+        out.push(`${tokens[i]} ${tokens[i + 1]} ${tokens[i + 2]}`);
+    }
+    return out;
+}
 
-        // Grouping extracts by theme to avoid duplication
-        const grouped = {};
-        extracts.slice(0, 10).forEach(ex => {
-            const rawTheme = (ex.matchedKeywords && ex.matchedKeywords.length > 0) ? ex.matchedKeywords[0] : 'Strategic Alignment';
-            const theme = rawTheme.charAt(0).toUpperCase() + rawTheme.slice(1);
-            if (!grouped[theme]) grouped[theme] = [];
-            
-            // Avoid text duplication
-            const text = ex.text.substring(0, 350) + (ex.text.length > 350 ? '...' : '');
-            if (!grouped[theme].includes(text)) grouped[theme].push(text);
-        });
+function distinctivePhrases(targetText, allOtherTexts, maxN = 3) {
+    const targetTri = new Set(trigrams(tokenize(targetText)));
+    const otherTri = new Set();
+    for (const other of allOtherTexts) {
+        trigrams(tokenize(other)).forEach(t => otherTri.add(t));
+    }
+    return [...targetTri]
+        .filter(t => !otherTri.has(t))
+        .filter(t => t.length >= 14)
+        .sort((a, b) => b.length - a.length)
+        .slice(0, maxN);
+}
 
-        // Render groups
-        Object.keys(grouped).forEach(theme => {
-            justificationForLevel += `• ${theme}: The organization explicitly identifies its objective as creating value through this pillar.\n`;
-            grouped[theme].forEach(text => {
-                justificationForLevel += `    ◦ "${text}"\n`;
-            });
-            justificationForLevel += `\n`;
-        });
+function truncate(text, maxChars) {
+    if (!text) return '';
+    if (text.length <= maxChars) return text;
+    const cut = text.slice(0, maxChars).replace(/\s\S*$/, '');
+    return cut + '…';
+}
 
-        // Add the cohesive integration theme
-        justificationForLevel += `• Cohesively Integrating People, Profit, and the Planet: The organization's strategy and reporting structure are explicitly built around integrating these three elements. As supported by the density of thematic signals like "${extracts.slice(0, 3).map(e => e.matchedKeywords[0]).join(', ')}", the audit ensures that profit-driven aims are directly linked with responsibilities to society and the broader ecosystem, fulfilling the definitive requirements for ${scoreData.label} maturity.`;
+function summarizeLevelDef(def) {
+    const firstSentence = (def.split(/(?<=[.!?])\s+/)[0] || def).trim();
+    return firstSentence
+        .replace(/^The organization/i, 'the organization')
+        .replace(/\.$/, '');
+}
+
+
+// ---------------------------------------------------------------------------
+// Core builders
+// ---------------------------------------------------------------------------
+
+function buildMainJustification(extracts, rubric, chosenLevel, dimensionTitle) {
+    const chosenDef = (rubric || []).find(r => r.l === chosenLevel);
+    if (!chosenDef) {
+        return 'Unable to determine level — no relevant evidence found in the document.';
     }
 
-    let justificationOthers = '';
-    if (!hasContent) {
-        justificationOthers = 'Unable to score — no relevant content identified in the report for this dimension.';
-    } else {
-        [1, 2, 3, 4, 5].forEach(l => {
-            if (l === scoreData.score) return;
-            const rubricItem = getRubric(l - 1);
-            const levelLabel = `${rubricItem.label}: ${rubricItem.criteria}`;
-
-            justificationOthers += `• Statement ${l}: `;
-            if (l < scoreData.score) {
-                justificationOthers += `This level was rejected as the identified evidence demonstrates maturity characteristics that significantly exceed the requirements of "${levelLabel}". The organisation's disclosures point to a more sophisticated and ${scoreData.score >= 4 ? 'exponential' : 'integrated'} approach than what is defined at this lower tier.\n\n`;
-            } else {
-                justificationOthers += `This level was not assigned because the current audit did not identify sufficient verbatim signals to validate the higher-tier requirements of "${levelLabel}". While foundational and intermediate signals are present, the specific transformative impact required for Level ${l} remains unsubstantiated in the public report text.\n\n`;
-            }
-        });
+    const top = (extracts || []).slice(0, 3);
+    if (top.length === 0) {
+        return `No relevant evidence was identified in the document for the '${dimensionTitle}' dimension.`;
     }
 
-    return { main: justificationForLevel.trim(), others: justificationOthers.trim() };
-};
+    const topQuotes = top
+        .map(e => `(p.${e.page}) "${truncate(e.text, 180)}"`)
+        .join(' ');
 
-const buildSummary = (question, extracts, scoreData) => {
+    return (
+        `The evidence aligns most closely with Level ${chosenLevel} (${chosenDef.t}) ` +
+        `for the '${dimensionTitle}' dimension. ` +
+        `The rubric defines this level as: "${chosenDef.d}" ` +
+        `Supporting evidence from the report includes: ${topQuotes}`
+    );
+}
+
+
+function buildOtherLevelsJustification(rubric, chosenLevel) {
+    if (!rubric || rubric.length === 0) return '';
+    const chosenDef = rubric.find(r => r.l === chosenLevel);
+    if (!chosenDef) return '';
+
+    const otherDefsExceptChosen = rubric
+        .filter(r => r.l !== chosenLevel)
+        .map(r => r.d);
+
+    const lines = [];
+    for (const level of rubric) {
+        if (level.l === chosenLevel) continue;
+
+        const otherDefsExceptThis = rubric
+            .filter(r => r.l !== level.l)
+            .map(r => r.d);
+
+        const thisDistinct = distinctivePhrases(level.d, otherDefsExceptThis, 3);
+        const chosenDistinct = distinctivePhrases(chosenDef.d, otherDefsExceptChosen, 3);
+
+        if (level.l < chosenLevel) {
+            lines.push(
+                `Level ${level.l} (${level.t}): Accurate but incomplete. The evidence ` +
+                `extends beyond this description, substantively demonstrating aspects ` +
+                `unique to Level ${chosenLevel}` +
+                (chosenDistinct.length
+                    ? ` — notably "${chosenDistinct.join('", "')}"`
+                    : '') +
+                ` — which this statement does not capture.`
+            );
+        } else {
+            lines.push(
+                `Level ${level.l} (${level.t}): Overstates the evidence. The report ` +
+                `does not substantively demonstrate the distinguishing features of ` +
+                `this level` +
+                (thisDistinct.length
+                    ? ` — notably "${thisDistinct.join('", "')}"`
+                    : '') +
+                `. The evidence aligns more closely with Level ${chosenLevel}.`
+            );
+        }
+    }
+    return lines.join('\n\n');
+}
+
+
+function buildSummaryCore(extracts, rubric, chosenLevel, dimensionTitle) {
     if (!extracts || extracts.length === 0) {
-        return 'Unable to score — no relevant content identified in the report for this dimension.';
+        return 'No relevant content found for this dimension in the document.';
     }
 
-    const questionTitle = question.title || 'this dimension';
-    const topExtract = extracts[0].text;
-    const secondExtract = extracts[Math.min(1, extracts.length - 1)].text;
-    const thirdExtract = extracts[Math.min(2, extracts.length - 1)].text;
+    const chosenDef = (rubric || []).find(r => r.l === chosenLevel);
+    const levelName = chosenDef ? chosenDef.t : `Level ${chosenLevel}`;
 
-    // INTRO PARAGRAPH
-    let summary = `The organization's explicit vision for "${questionTitle}" is central to its broader sustainability and impact strategy. This forward-looking statement is supported by a multi-faceted purpose and strategy that balances stakeholder value, operational excellence, and sustainable practices, culminating in a Level ${scoreData.score} positioning.\n\n`;
+    const uniquePages = [...new Set(extracts.map(e => e.page))];
+    const pageList = uniquePages.length <= 5
+        ? uniquePages.join(', ')
+        : `${uniquePages.slice(0, 4).join(', ')}, and others`;
 
-    // SECTION 1: CORE PURPOSE AND OBJECTIVES
-    summary += `Core Purpose and Objectives\n`;
-    summary += `The primary objective identified within the public disclosures is to generate value by "${topExtract.substring(0, 350)}${topExtract.length > 350 ? '...' : ''}". This objective is complemented by a client-focused purpose that seeks to harmonize long-term structural growth with attractive impact returns, moving the organization towards ${scoreData.label} maturity.\n\n`;
+    const primaryQuote = extracts[0] ? truncate(extracts[0].text, 200) : '';
+    const secondaryQuote = extracts[1] ? truncate(extracts[1].text, 200) : '';
+    const tertiaryQuote = extracts[2] ? truncate(extracts[2].text, 200) : '';
 
-    // SECTION 2: STRATEGIC FOCUS AND MISSION
-    summary += `Strategic Focus and Mission\n`;
-    summary += `At its core, the strategy concentrates on delivering value through its mission of transparency and operational resilience. This is anchored in its market leadership and strategic core. Key tenets of this strategy include:\n`;
+    const parts = [];
 
-    const tenets = extracts.slice(0, 3).map((ex, idx) => {
-        const theme = (ex.matchedKeywords && ex.matchedKeywords.length > 0) ? ex.matchedKeywords[0].charAt(0).toUpperCase() + ex.matchedKeywords[0].slice(1) : 'Strategic Alignment';
-        return `• ${theme}: The organization emphasizes that "${ex.text.substring(0, 250)}..." (Page ${ex.page}). A cornerstone of this approach is the integration of these maturity drivers into every client interaction.\n`;
-    }).join('');
-    summary += tenets + '\n';
+    parts.push(
+        `The organization's approach to ${dimensionTitle.toLowerCase()} is ` +
+        `characterized at Level ${chosenLevel} (${levelName}), drawing on ` +
+        `${extracts.length} verbatim extracts spanning page(s) ${pageList}.`
+    );
 
-    // SECTION 3: SUSTAINABILITY AND IMPACT STRATEGY
-    summary += `Sustainability and Impact Strategy\n`;
-    summary += `A key component of the firm's purpose regarding "${questionTitle}" is its sustainability and impact strategy, which is built on three pillars:\n`;
-    summary += `1. Protect: To manage the business in alignment with long-term strategy and evolving standards. This involves maintaining a strong control and risk framework, substantiated by disclosures such as "${secondExtract.substring(0, 150)}...".\n`;
-    summary += `2. Grow: To embed an innovative offering across all business divisions to meet evolving needs, leveraging proficiency in ${extracts.map(e => e.matchedKeywords[0] || 'growth').slice(3, 6).join(', ')}.\n`;
-    summary += `3. Attract: To be the "organization of choice" for stakeholders by maintaining top-tier sustainability ratings and being a go-to employer, as evidenced across page ${extracts[Math.min(4, extracts.length-1)].page} of the report.\n\n`;
+    if (primaryQuote) {
+        parts.push(
+            `The primary evidence appears in the form of statements such as: ` +
+            `"${primaryQuote}" (p.${extracts[0].page}).`
+        );
+    }
 
-    // CONCLUDING PARAGRAPH
-    summary += `The organization supports its stakeholders and shareholders by mobilizing capital for strategic transitions, aligning lending with long-term objectives, and maintaining a robust, capital-generative business model. This commitment to sustainable growth and a strong risk-aware culture is evidenced by disclosures like "${thirdExtract.substring(0, 250)}...", reinforcing its Level ${scoreData.score} assessment.`;
+    if (secondaryQuote || tertiaryQuote) {
+        const supporting = [];
+        if (secondaryQuote) {
+            supporting.push(`"${secondaryQuote}" (p.${extracts[1].page})`);
+        }
+        if (tertiaryQuote) {
+            supporting.push(`"${tertiaryQuote}" (p.${extracts[2].page})`);
+        }
+        parts.push(`Additional supporting evidence includes: ${supporting.join('; ')}.`);
+    }
 
-    return summary.trim();
+    if (chosenDef) {
+        parts.push(
+            `Taken together, these verbatim signals are consistent with the ` +
+            `Level ${chosenLevel} rubric definition for this dimension, which ` +
+            `describes an organization where ${summarizeLevelDef(chosenDef.d)}.`
+        );
+    }
+
+    return parts.join(' ');
+}
+
+
+// ---------------------------------------------------------------------------
+// Wrappers matching engine.js call signatures
+// ---------------------------------------------------------------------------
+
+function buildJustification(question, extracts, scoreData) {
+    const rubric = (question && question.rubric) || [];
+    const chosenLevel = (scoreData && scoreData.score) || 0;
+    const dimensionTitle = (question && question.title) || '';
+
+    if (!scoreData || scoreData.noContent || chosenLevel === 0) {
+        return {
+            main: `No relevant evidence was identified in the document for the '${dimensionTitle}' dimension.`,
+            others: '',
+        };
+    }
+
+    return {
+        main: buildMainJustification(extracts, rubric, chosenLevel, dimensionTitle),
+        others: buildOtherLevelsJustification(rubric, chosenLevel),
+    };
+}
+
+function buildSummary(question, extracts, scoreData) {
+    const rubric = (question && question.rubric) || [];
+    const chosenLevel = (scoreData && scoreData.score) || 0;
+    const dimensionTitle = (question && question.title) || '';
+    return buildSummaryCore(extracts, rubric, chosenLevel, dimensionTitle);
+}
+
+
+module.exports = {
+    buildJustification,
+    buildSummary,
+    buildMainJustification,
+    buildOtherLevelsJustification,
+    buildSummaryCore,
+    distinctivePhrases,
 };
-
-module.exports = { buildJustification, buildSummary };

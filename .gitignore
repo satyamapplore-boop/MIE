@@ -7,3 +7,13 @@ dist/
 build/
 .vscode/
 .idea/
+.vercel
+all_sentences.txt
+analysis_results*.json
+fresh_out*
+v4_polish*
+__pycache__/
+*.pyc
+*.pdf
+diagnose_v4.py
+mie_v*.py
